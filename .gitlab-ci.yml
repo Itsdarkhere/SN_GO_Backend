@@ -8,7 +8,7 @@ build:
   script:
     - apk add git
     - cd ..
-    - [ ! -d "./core" ] && git clone https://gitlab.com/love4src/core.git
+    - "[ ! -d core ] && git clone https://gitlab.com/love4src/core.git"
     - cd core
     - git pull origin $CI_COMMIT_BRANCH
     - echo "$DEPLOY_DOCKER_PASS" | docker login -u "$DEPLOY_DOCKER_USER" --password-stdin registry.gitlab.com
