@@ -10,7 +10,8 @@ build:
     - cd ..
     - "[ ! -d core ] && git clone https://gitlab.com/love4src/core.git"
     - cd core
-    - git pull origin $CI_COMMIT_BRANCH
+    - git pull origin main
+    - cd ..
     - echo "$DEPLOY_DOCKER_PASS" | docker login -u "$DEPLOY_DOCKER_USER" --password-stdin registry.gitlab.com
     - docker build --tag $CI_REGISTRY:$CI_COMMIT_SHA backend
     - docker push $CI_REGISTRY:$CI_COMMIT_SHA
