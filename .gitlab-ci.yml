@@ -3,14 +3,15 @@ image: docker:20.10.6
 variables:
   CI_REGISTRY: "registry.gitlab.com/love4src/backend"
 
+before_script:
+  - apk add git
+  - cd ..
+  - "[ ! -d core ] && git clone https://gitlab.com/love4src/core.git"
+  - "[ -d core ] && cd core && git pull.rebase origin main && cd .."
+
 build:
   stage: build
   script:
-    - apk add git
-    - cd ..
-    - "[ ! -d core ] && git clone https://gitlab.com/love4src/core.git"
-    - cd core
-    - git pull origin main
     - cd ..
     - echo "$DEPLOY_DOCKER_PASS" | docker login -u "$DEPLOY_DOCKER_USER" --password-stdin registry.gitlab.com
     - docker build --tag $CI_REGISTRY:$CI_COMMIT_SHA backend
