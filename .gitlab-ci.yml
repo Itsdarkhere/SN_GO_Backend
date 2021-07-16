@@ -1,0 +1,24 @@
+image: docker:20.10.6
+
+variables:
+  CI_REGISTRY: "registry.gitlab.com/love4src/frontend"
+
+build:
+  stage: build
+  script:
+    - cd ..
+    - git clone git@gitlab.com:love4src/core.git
+    - echo "$DEPLOY_DOCKER_PASS" | docker login -u "$DEPLOY_DOCKER_USER" --password-stdin registry.gitlab.com
+    - docker build --tag $CI_REGISTRY:$CI_COMMIT_SHA backend
+    - docker push $CI_REGISTRY:$CI_COMMIT_SHA
+    - docker logout
+  only:
+    - main
+
+release:
+  stage: deploy
+  image: "hashicorp/levant:0.3.0"
+  script:
+    - levant deploy -address="http://65.21.92.186:4646" -var "commit_sha=$CI_COMMIT_SHA" bitclout-backend.hcl
+  only:
+    - main
