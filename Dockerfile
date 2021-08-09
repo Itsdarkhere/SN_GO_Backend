@@ -1,4 +1,4 @@
-FROM alpine:latest AS backend
+FROM alpine:3 AS backend
 
 RUN apk update
 RUN apk upgrade
@@ -32,7 +32,7 @@ COPY core/lib       ../core/lib
 RUN GOOS=linux go build -mod=mod -a -installsuffix cgo -o bin/backend main.go
 
 # create tiny image
-FROM alpine:latest
+FROM alpine:3
 
 RUN apk add --update vips-dev
 
