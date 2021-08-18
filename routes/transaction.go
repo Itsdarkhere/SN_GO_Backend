@@ -115,8 +115,9 @@ func (fes *APIServer) SubmitTransaction(ww http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	// If this is a basic transfer, we check if user has purchased CC (if this node is configured for Jumio or Twilio)
-	if txn.TxnMeta.GetTxnType() == lib.TxnTypeBasicTransfer && (fes.IsConfiguredForJumio() || fes.Twilio != nil){
+	_, diamondPostHashKeyExists := txn.ExtraData[lib.DiamondPostHashKey]
+	// If this is a basic transfer (but not a diamond action), we check if user has purchased CC (if this node is configured for Jumio or Twilio)
+	if !diamondPostHashKeyExists && txn.TxnMeta.GetTxnType() == lib.TxnTypeBasicTransfer && (fes.IsConfiguredForJumio() || fes.Twilio != nil) {
 		var userMetadata *UserMetadata
 		userMetadata, err = fes.getUserMetadataFromGlobalStateByPublicKeyBytes(txn.PublicKey)
 		if err != nil {
@@ -843,11 +844,12 @@ func (fes *APIServer) ExchangeBitcoinStateless(ww http.ResponseWriter, req *http
 
 // GetNanosFromSats - convert Satoshis to BitClout nanos
 func (fes *APIServer) GetNanosFromSats(satoshis uint64, feeBasisPoints uint64) (uint64, error) {
-	usdToBTC, err := GetUSDToBTCPrice()
-	if err != nil {
-		return 0, fmt.Errorf(" Problem getting usd to btc exchange rate: %v", err)
+	usdCentsPerBitcoin := fes.UsdCentsPerBitCoinExchangeRate
+	// If we don't have a valid value from monitoring at this time, use the price from the protocol
+	if usdCentsPerBitcoin == 0 {
+		readUtxoView, _ := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+		usdCentsPerBitcoin = float64(readUtxoView.GetCurrentUSDCentsPerBitcoin())
 	}
-	usdCentsPerBitcoin := usdToBTC * 100
 	usdCents := (float64(satoshis) * usdCentsPerBitcoin) / lib.SatoshisPerBitcoin
 	return fes.GetNanosFromUSDCents(usdCents, feeBasisPoints)
 }
