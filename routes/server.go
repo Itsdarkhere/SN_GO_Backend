@@ -57,6 +57,8 @@ const (
 	RoutePathTransferCreatorCoin      = "/api/v0/transfer-creator-coin"
 	RoutePathSendDiamonds             = "/api/v0/send-diamonds"
 	RoutePathAuthorizeDerivedKey      = "/api/v0/authorize-derived-key"
+	RoutePathAppendExtraData          = "/api/v0/append-extra-data"
+	RoutePathGetTransactionSpending   = "/api/v0/get-transaction-spending"
 
 	// user.go
 	RoutePathGetUsersStateless        = "/api/v0/get-users-stateless"
@@ -156,12 +158,13 @@ const (
 	RoutePathGetBuyDeSoFeeBasisPoints             = "/api/v0/admin/get-buy-deso-fee-basis-points"
 
 	// admin_transaction.go
-	RoutePathGetGlobalParams                    = "/api/v0/get-global-params"
-	RoutePathTestSignTransactionWithDerivedKey  = "/api/v0/admin/test-sign-transaction-with-derived-key"
+	RoutePathGetGlobalParams                   = "/api/v0/get-global-params"
+	RoutePathTestSignTransactionWithDerivedKey = "/api/v0/admin/test-sign-transaction-with-derived-key"
+
 	// Eventually we will deprecate the admin endpoint since it does not need to be protected.
-	RoutePathAdminGetGlobalParams               = "/api/v0/admin/get-global-params"
-	RoutePathUpdateGlobalParams                 = "/api/v0/admin/update-global-params"
-	RoutePathSwapIdentity                       = "/api/v0/admin/swap-identity"
+	RoutePathAdminGetGlobalParams = "/api/v0/admin/get-global-params"
+	RoutePathUpdateGlobalParams   = "/api/v0/admin/update-global-params"
+	RoutePathSwapIdentity         = "/api/v0/admin/swap-identity"
 
 	// admin_user.go
 	RoutePathAdminUpdateUserGlobalMetadata         = "/api/v0/admin/update-user-global-metadata"
@@ -177,6 +180,13 @@ const (
 	RoutePathAdminUpdateGlobalFeed = "/api/v0/admin/update-global-feed"
 	RoutePathAdminPinPost          = "/api/v0/admin/pin-post"
 	RoutePathAdminRemoveNilPosts   = "/api/v0/admin/remove-nil-posts"
+
+	// admin_fees.go
+	RoutePathAdminSetTransactionFeeForTransactionType = "/api/v0/admin/set-txn-fee-for-txn-type"
+	RoutePathAdminSetAllTransactionFees               = "/api/v0/admin/set-all-txn-fees"
+	RoutePathAdminGetTransactionFeeMap                = "/api/v0/admin/get-transaction-fee-map"
+	RoutePathAdminAddExemptPublicKey                  = "/api/v0/admin/add-exempt-public-key"
+	RoutePathAdminGetExemptPublicKeys                 = "/api/v0/admin/get-exempt-public-keys"
 
 	// admin_nft.go
 	RoutePathAdminGetNFTDrop    = "/api/v0/admin/get-nft-drop"
@@ -252,6 +262,12 @@ type APIServer struct {
 	// Base-58 prefix to check for to determine if a string could be a public key.
 	PublicKeyBase58Prefix string
 
+	// Map of transaction type to []*lib.DeSoOutput that represent fees assessed on each transaction of that type.
+	TransactionFeeMap map[lib.TxnType][]*lib.DeSoOutput
+
+	// Map of public keys that are exempt from nod fees
+	ExemptPublicKeyMap map[string]interface{}
+
 	// Signals that the frontend server is in a stopped state
 	quit chan struct{}
 }
@@ -312,6 +328,11 @@ func NewAPIServer(
 	fes.UpdateUSDCentsToDeSoExchangeRate()
 	fes.UpdateUSDToBTCPrice()
 	fes.UpdateUSDToETHPrice()
+
+	// Get the transaction fee map from global state if it exists
+	fes.TransactionFeeMap = fes.GetTransactionFeeMapFromGlobalState()
+
+	fes.ExemptPublicKeyMap = fes.GetExemptPublicKeyMapFromGlobalState()
 
 	// Then monitor them
 	fes.StartExchangePriceMonitoring()
@@ -678,6 +699,20 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathAuthorizeDerivedKey,
 			fes.AuthorizeDerivedKey,
+			PublicAccess,
+		},
+		{
+			"AppendExtraData",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAppendExtraData,
+			fes.AppendExtraData,
+			PublicAccess,
+		},
+		{
+			"GetTransactionSpending",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTransactionSpending,
+			fes.GetTransactionSpending,
 			PublicAccess,
 		},
 		{
@@ -1087,6 +1122,41 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			fes.AdminUpdateTutorialCreator,
 			SuperAdminAccess,
 		},
+		{
+			"AdminSetTransactionFeeForTransactionType",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminSetTransactionFeeForTransactionType,
+			fes.AdminSetTransactionFeeForTransactionType,
+			SuperAdminAccess,
+		},
+		{
+			"AdminSetAllTransactionFees",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminSetAllTransactionFees,
+			fes.AdminSetAllTransactionFees,
+			SuperAdminAccess,
+		},
+		{
+			"AdminGetTransactionFeeMap",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminGetTransactionFeeMap,
+			fes.AdminGetTransactionFeeMap,
+			SuperAdminAccess,
+		},
+		{
+			"AdminAddExemptPublicKey",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminAddExemptPublicKey,
+			fes.AdminAddExemptPublicKey,
+			SuperAdminAccess,
+		},
+		{
+			"AdminGetExemptPublicKeys",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminGetExemptPublicKeys,
+			fes.AdminGetExemptPublicKeys,
+			SuperAdminAccess,
+		},
 		// End all /admin routes
 		// GET endpoints for managing parameters related to Buying DeSo
 		{
@@ -1316,11 +1386,30 @@ func AddHeaders(inner http.Handler, allowedOrigins []string) http.Handler {
 		actualOrigin := r.Header.Get("Origin")
 		match := false
 		for _, allowedOrigin := range allowedOrigins {
-			// Note: Prior versions of this code used a regex, but I changed it to a literal match,
-			// since I didn't want to risk a security vulnerability with a broken regex
-			if allowedOrigin == actualOrigin || allowedOrigin == "*" {
+			// Match wildcard
+			if allowedOrigin == "*" {
 				match = true
 				break
+			}
+
+			// Exact match including protocol and subdomain e.g. https://my.domain.com
+			if allowedOrigin == actualOrigin {
+				match = true
+				break
+			}
+
+			// Match any domain excluding protocol and subdomain e.g. domain.com
+			actualDomain := strings.Split(actualOrigin, "://")
+			if len(actualDomain) >= 2 {
+				actualDomain = strings.Split(actualDomain[1], ".")
+				actualDomainLen := len(actualDomain)
+				if actualDomainLen >= 2 {
+					actualDomainStr := fmt.Sprintf("%s.%s", actualDomain[actualDomainLen-2], actualDomain[actualDomainLen-1])
+					if actualDomainStr == allowedOrigin {
+						match = true
+						break
+					}
+				}
 			}
 		}
 
@@ -1331,16 +1420,16 @@ func AddHeaders(inner http.Handler, allowedOrigins []string) http.Handler {
 		if r.RequestURI == RoutePathUploadImage && strings.HasPrefix(contentType, "multipart/form-data") {
 			match = true
 			actualOrigin = "*"
-		} else if r.RequestURI == RoutePathGetJumioStatusForPublicKey {
-			// we set the headers for all requests to GetJumioStatusForPublicKey. This allows third-party frontends to
-			// access this endpoint
+		} else if r.RequestURI == RoutePathGetJumioStatusForPublicKey || r.RequestURI == RoutePathUploadVideo || r.RequestURI == RoutePathGetVideoStatus {
+			// We set the headers for all requests to GetJumioStatusForPublicKey, UploadVideo, and GetVideoStatus.
+			// This allows third-party frontends to access this endpoint
 			match = true
 			actualOrigin = "*"
-		} else if r.Method == "POST" && contentType != "application/json" && r.RequestURI != RoutePathJumioCallback && r.RequestURI != RoutePathUploadVideo {
+		} else if r.Method == "POST" && contentType != "application/json" && r.RequestURI != RoutePathJumioCallback {
 			invalidPostRequest = true
 		}
 
-		if match || r.RequestURI == RoutePathUploadImage || r.RequestURI == RoutePathGetJumioStatusForPublicKey {
+		if match {
 			// Needed in order for the user's browser to set a cookie
 			w.Header().Add("Access-Control-Allow-Credentials", "true")
 
@@ -1463,6 +1552,10 @@ func (fes *APIServer) ValidateJWT(publicKey string, jwtToken string) (bool, erro
 	}
 
 	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
+		// Do not check token issued at time. We still check expiration time.
+		mapClaims := token.Claims.(jwt.MapClaims)
+		delete(mapClaims, "iat")
+
 		return pubKey.ToECDSA(), nil
 	})
 
