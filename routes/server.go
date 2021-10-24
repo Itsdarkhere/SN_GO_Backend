@@ -99,6 +99,7 @@ const (
 	RoutePathAcceptNFTBid             = "/api/v0/accept-nft-bid"
 	RoutePathGetNFTBidsForNFTPost     = "/api/v0/get-nft-bids-for-nft-post"
 	RoutePathGetNFTShowcase           = "/api/v0/get-nft-showcase"
+	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
 	RoutePathGetNextNFTShowcase       = "/api/v0/get-next-nft-showcase"
 	RoutePathGetNFTCollectionSummary  = "/api/v0/get-nft-collection-summary"
 	RoutePathGetNFTEntriesForPostHash = "/api/v0/get-nft-entries-for-nft-post"
@@ -648,6 +649,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetNFTShowcase,
 			fes.GetNFTShowcase,
+			PublicAccess,
+		},
+		{
+			"GetNFTShowcaseSupernovas",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetNFTShowcaseSupernovas,
+			fes.GetNFTShowcasePlus,
 			PublicAccess,
 		},
 		{
