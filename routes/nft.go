@@ -668,6 +668,10 @@ type GetNFTShowcaseResponse struct {
 	NFTCollections []*NFTCollectionResponse
 }
 
+type GetNFTShowcaseResponsePlus struct {
+	NFTCollections []*NFTCollectionResponsePlus
+}
+
 func (fes *APIServer) GetNFTShowcase(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := GetNFTShowcaseRequest{}
@@ -826,7 +830,7 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 	if requestData.ReaderPublicKeyBase58Check != "" {
 		readerPKID = utxoView.GetPKIDForPublicKey(readerPublicKeyBytes).PKID
 	}
-	var nftCollectionResponses []*NFTCollectionResponse
+	var nftCollectionResponses []*NFTCollectionResponsePlus
 	for _, nftHash := range dropEntry.NFTHashes {
 		postEntry := utxoView.GetPostEntryForPostHash(nftHash)
 		if postEntry == nil {
@@ -846,13 +850,13 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 				return
 			}
 			postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
-			nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponse(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
+			nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
 			nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponsePlus)
 		}
 	}
 
 	// Return all the data associated with the transaction in the response
-	res := GetNFTShowcaseResponse{
+	res := GetNFTShowcaseResponsePlus{
 		NFTCollections: nftCollectionResponses,
 	}
 
