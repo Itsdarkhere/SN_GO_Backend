@@ -729,11 +729,9 @@ func (fes *APIServer) GetNFTShowcase(ww http.ResponseWriter, req *http.Request) 
 			return
 		}
 
-		// Should fix the marketplace, stopped working once burn was implemented
-        if postEntry.NumNFTCopiesBurned == postEntry.NumNFTCopies {
-            _AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: All copies of the NFT have been burned."))
-            return
-        }
+		if postEntry.NumNFTCopiesBurned == postEntry.NumNFTCopies {
+			continue
+		}
 
 		nftKey := lib.MakeNFTKey(nftHash, 1)
 		nftEntry := utxoView.GetNFTEntryForNFTKey(&nftKey)

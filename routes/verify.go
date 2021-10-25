@@ -313,8 +313,8 @@ func (fes *APIServer) SubmitPhoneNumberVerificationCode(ww http.ResponseWriter, 
 	/**************************************************************/
 	// Send the user starter DeSo, if we haven't already sent it
 	/**************************************************************/
-	if settingPhoneNumberForFirstTime && fes.Config.StarterDeSoSeed != "" {
-		amountToSendNanos := fes.Config.StarterDeSoNanos
+	if settingPhoneNumberForFirstTime && fes.Config.StarterDESOSeed != "" {
+		amountToSendNanos := fes.Config.StarterDESONanos
 
 		if len(requestData.PhoneNumber) == 0 || requestData.PhoneNumber[0] != '+' {
 			_AddBadRequestError(ww, fmt.Sprintf("SubmitPhoneNumberVerificationCode: Phone number must start with a plus sign"))
@@ -879,7 +879,7 @@ func (fes *APIServer) JumioVerifiedHandler(userMetadata *UserMetadata, jumioTran
 		if desoNanos > 0 {
 			// Check the balance of the starter deso seed.
 			var balanceInsufficient bool
-			balanceInsufficient, err = fes.ExceedsDeSoBalance(desoNanos, fes.Config.StarterDeSoSeed)
+			balanceInsufficient, err = fes.ExceedsDeSoBalance(desoNanos, fes.Config.StarterDESOSeed)
 			if err != nil {
 				return userMetadata, fmt.Errorf("JumioVerifiedHandler: Error checking if send deso balance is sufficient: %v", err)
 			}
@@ -906,11 +906,20 @@ func (fes *APIServer) JumioVerifiedHandler(userMetadata *UserMetadata, jumioTran
 			if err != nil {
 				return userMetadata, fmt.Errorf("JumioVerifiedHandler: Error getting referral info: %v", err)
 			}
+			// Add an index for logging all the PKIDs referred by a single PKID+ReferralHash pair.
 			refereePKID := utxoView.GetPKIDForPublicKey(publicKeyBytes)
 			pkidReferralHashRefereePKIDKey := GlobalStateKeyForPKIDReferralHashRefereePKID(referralInfo.ReferrerPKID, []byte(referralInfo.ReferralHashBase58), refereePKID.PKID)
 			if err = fes.GlobalStatePut(pkidReferralHashRefereePKIDKey, []byte{1}); err != nil {
 				glog.Errorf("JumioVerifiedHandler: Error adding to the index of users who were referred by a given referral code")
 			}
+			// Same as the index above but sorted by timestamp.
+			currTimestampNanos := uint64(time.Now().UTC().UnixNano()) // current tstamp
+			tstampPKIDReferralHashRefereePKIDKey := GlobalStateKeyForTimestampPKIDReferralHashRefereePKID(
+				currTimestampNanos, referralInfo.ReferrerPKID, []byte(referralInfo.ReferralHashBase58), refereePKID.PKID)
+			if err = fes.GlobalStatePut(tstampPKIDReferralHashRefereePKIDKey, []byte{1}); err != nil {
+				glog.Errorf("JumioVerifiedHandler: Error adding to the index of users who were referred by a given referral code")
+			}
+
 			// Calculate how much to pay the referrer
 			referrerDeSoNanos := fes.GetNanosFromUSDCents(float64(referralInfo.ReferrerAmountUSDCents), 0)
 			if referralInfo.TotalReferrals >= referralInfo.MaxReferrals && referralInfo.MaxReferrals > 0 {
@@ -918,7 +927,7 @@ func (fes *APIServer) JumioVerifiedHandler(userMetadata *UserMetadata, jumioTran
 			}
 			// Check the balance of the starter deso seed compared to the referrer deso nanos.
 			var balanceInsufficientForReferrer bool
-			balanceInsufficientForReferrer, err = fes.ExceedsDeSoBalance(referrerDeSoNanos, fes.Config.StarterDeSoSeed)
+			balanceInsufficientForReferrer, err = fes.ExceedsDeSoBalance(referrerDeSoNanos, fes.Config.StarterDESOSeed)
 			if err != nil {
 				return userMetadata, fmt.Errorf("JumioVerifiedHandler: Error checking if send deso balance is sufficient: %v", err)
 			}
