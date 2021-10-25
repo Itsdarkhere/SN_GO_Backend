@@ -134,9 +134,8 @@ const (
 	RoutePathStartOrSkipTutorial = "/api/v0/start-or-skip-tutorial"
 
 	// eth.go
-	RoutePathGetETHBalance     = "/api/v0/get-eth-balance"
-	RoutePathCreateETHTx       = "/api/v0/create-eth-tx"
 	RoutePathSubmitETHTx       = "/api/v0/submit-eth-tx"
+	RoutePathQueryETHRPC       = "/api/v0/query-eth-rpc"
 	RoutePathAdminProcessETHTx = "/api/v0/admin/process-eth-tx"
 
 	// wyre.go
@@ -215,6 +214,7 @@ const (
 	RoutePathAdminUpdateReferralHash        = "/api/v0/admin/update-referral-hash"
 	RoutePathAdminUploadReferralCSV         = "/api/v0/admin/upload-referral-csv"
 	RoutePathAdminDownloadReferralCSV       = "/api/v0/admin/download-referral-csv"
+	RoutePathAdminDownloadRefereeCSV        = "/api/v0/admin/download-referee-csv"
 
 	// referrals.go
 	RoutePathGetReferralInfoForUser         = "/api/v0/get-referral-info-for-user"
@@ -908,20 +908,6 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 
 		// ETH Routes
 		{
-			"GetETHBalance",
-			[]string{"POST", "OPTIONS"},
-			RoutePathGetETHBalance,
-			fes.GetETHBalance,
-			PublicAccess,
-		},
-		{
-			"CreateETHTx",
-			[]string{"POST", "OPTIONS"},
-			RoutePathCreateETHTx,
-			fes.CreateETHTx,
-			PublicAccess,
-		},
-		{
 			"SubmitETHTx",
 			[]string{"POST", "OPTIONS"},
 			RoutePathSubmitETHTx,
@@ -934,6 +920,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			RoutePathAdminProcessETHTx,
 			fes.AdminProcessETHTx,
 			SuperAdminAccess,
+		},
+		{
+			"QueryETHRPC",
+			[]string{"POST", "OPTIONS"},
+			RoutePathQueryETHRPC,
+			fes.QueryETHRPC,
+			PublicAccess,
 		},
 
 		// Begin all /admin routes
@@ -1203,6 +1196,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathAdminDownloadReferralCSV,
 			fes.AdminDownloadReferralCSV,
+			SuperAdminAccess,
+		},
+		{
+			"AdminDownloadReferralCSV",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAdminDownloadRefereeCSV,
+			fes.AdminDownloadRefereeCSV,
 			SuperAdminAccess,
 		},
 		{
@@ -1768,8 +1768,8 @@ func (fes *APIServer) StartSeedBalancesMonitoring() {
 					return
 				}
 				tags := []string{}
-				fes.logBalanceForSeed(fes.Config.StarterDeSoSeed, "STARTER_DESO", tags)
-				fes.logBalanceForSeed(fes.Config.BuyDeSoSeed, "BUY_DESO", tags)
+				fes.logBalanceForSeed(fes.Config.StarterDESOSeed, "STARTER_DESO", tags)
+				fes.logBalanceForSeed(fes.Config.BuyDESOSeed, "BUY_DESO", tags)
 			case <-fes.quit:
 				break out
 			}

@@ -729,20 +729,22 @@ func (fes *APIServer) GetNFTShowcase(ww http.ResponseWriter, req *http.Request) 
 			return
 		}
 
-		// Should fix the marketplace, stopped working once burn was implemented
-        if postEntry.NumNFTCopiesBurned != postEntry.NumNFTCopies {
-			nftKey := lib.MakeNFTKey(nftHash, 1)
-			nftEntry := utxoView.GetNFTEntryForNFTKey(&nftKey)
+		if postEntry.NumNFTCopiesBurned == postEntry.NumNFTCopies {
+			continue
+		}
 
-			postEntryResponse, err := fes._postEntryToResponse(
-				postEntry, false, fes.Params, utxoView, readerPublicKeyBytes, 2)
-			if err != nil {
-				_AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: Found invalid post entry for NFT hash."))
-				return
-			}
-			postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
-			nftCollectionResponse := fes._nftEntryToNFTCollectionResponse(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
-			nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponse)
+		nftKey := lib.MakeNFTKey(nftHash, 1)
+		nftEntry := utxoView.GetNFTEntryForNFTKey(&nftKey)
+
+		postEntryResponse, err := fes._postEntryToResponse(
+			postEntry, false, fes.Params, utxoView, readerPublicKeyBytes, 2)
+		if err != nil {
+			_AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: Found invalid post entry for NFT hash."))
+			return
+		}
+		postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+		nftCollectionResponse := fes._nftEntryToNFTCollectionResponse(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
+		nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponse)
 		}
 	}
 
