@@ -745,7 +745,6 @@ func (fes *APIServer) GetNFTShowcase(ww http.ResponseWriter, req *http.Request) 
 		postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 		nftCollectionResponse := fes._nftEntryToNFTCollectionResponse(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
 		nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponse)
-		}
 	}
 
 	// Return all the data associated with the transaction in the response
@@ -758,6 +757,7 @@ func (fes *APIServer) GetNFTShowcase(ww http.ResponseWriter, req *http.Request) 
 		return
 	}
 }
+
 type GetNextNFTShowcaseRequest struct{}
 
 type GetNextNFTShowcaseResponse struct {
