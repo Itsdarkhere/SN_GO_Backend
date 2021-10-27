@@ -1,6 +1,8 @@
 package routes
 
 import (	
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -223,7 +225,7 @@ func (fes *APIServer) AddToMarketplace(ww http.ResponseWriter, req *http.Request
 
 	if requestData.DropNumber < 1 {
 		_AddBadRequestError(ww, fmt.Sprintf(
-			"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 2")
+			"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 2"))
 		return
 	}
 

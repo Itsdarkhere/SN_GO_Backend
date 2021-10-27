@@ -228,7 +228,7 @@ const (
 	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
-	RoutePathAddToMarketplaceSupernovas = "/api/v0/add-to-marketplace-supernovas"
+	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
 )
 
 // APIServer provides the interface between the blockchain and things like the
