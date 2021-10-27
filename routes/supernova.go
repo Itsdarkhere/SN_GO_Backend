@@ -162,3 +162,214 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 		AvailableSerialNumbers: serialNumbersForSale,
 	}
 }
+// These are to add to market on MINT
+// AdminGetNFTDrop
+func (fes *APIServer) GetMarketplaceRef(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := AdminGetNFTDropRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetMarketplaceRef: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR1. 1"))
+		return
+	}
+
+	var err error
+	var dropEntryToReturn *NFTDropEntry
+	if requestData.DropNumber < 0 {
+		dropEntryToReturn, err = fes.GetLatestNFTDropEntry()
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetMarketplaceRef: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR1. 2"))
+			return
+		}
+	} else {
+		// Look up the drop entry for the drop number given.
+		dropEntryToReturn, err = fes.GetNFTDropEntry(uint64(requestData.DropNumber))
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf(
+				"GetMarketplaceRef: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR1. 3"))
+			return
+		}
+	}
+
+	// Note that "dropEntryToReturn" can be nil if there are no entries in global state.
+	var postEntryResponses []*PostEntryResponse
+	if dropEntryToReturn != nil {
+		postEntryResponses, err = fes.GetPostsForNFTDropEntry(dropEntryToReturn)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetMarketplaceRef: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR1. 4"))
+			return
+		}
+	}
+
+	// Return all the data associated with the transaction in the response
+	res := AdminGetNFTDropResponse{
+		DropEntry: dropEntryToReturn,
+		Posts:     postEntryResponses,
+	}
+
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetMarketplaceRef: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR1. 5"))
+		return
+	}
+}
+// AdminUpdateNFTDrop
+func (fes *APIServer) AddToMarketplace(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := AdminUpdateNFTDropRequest{}
+	err := decoder.Decode(&requestData)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 1"))
+		return
+	}
+
+	if requestData.DropNumber < 1 {
+		_AddBadRequestError(ww, fmt.Sprintf(
+			"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 2")
+		return
+	}
+
+	if requestData.DropTstampNanos < 0 {
+		_AddBadRequestError(ww, fmt.Sprintf(
+			"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 3"))
+		return
+	}
+
+	if requestData.NFTHashHexToAdd != "" && requestData.NFTHashHexToRemove != "" {
+		_AddBadRequestError(ww, fmt.Sprint(
+			"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 3"))
+		return
+	}
+
+	var latestDropEntry *NFTDropEntry
+	latestDropEntry, err = fes.GetLatestNFTDropEntry()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 4"))
+		return
+	}
+
+	// Now for the business.
+	var updatedDropEntry *NFTDropEntry
+	currentTime := uint64(time.Now().UnixNano())
+	if uint64(requestData.DropNumber) > latestDropEntry.DropNumber {
+		// If we make it here, we are making a new drop. Run some checks to make sure that the
+		// timestamp provided make sense.
+		if latestDropEntry.DropTstampNanos > currentTime {
+			_AddBadRequestError(ww, fmt.Sprint(
+				"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 5"))
+			return
+		}
+		if uint64(requestData.DropTstampNanos) < currentTime {
+			_AddBadRequestError(ww, fmt.Sprint(
+				"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 6"))
+			return
+		}
+		if uint64(requestData.DropTstampNanos) < latestDropEntry.DropTstampNanos {
+			_AddBadRequestError(ww, fmt.Sprint(
+				"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 7"))
+			return
+		}
+
+		// Regardless of the drop number provided, we force the new drop to be the previous number + 1.
+		updatedDropEntry = &NFTDropEntry{
+			DropNumber:      uint64(latestDropEntry.DropNumber + 1),
+			DropTstampNanos: uint64(requestData.DropTstampNanos),
+		}
+
+	} else {
+		// In this case, we are updating an existing drop.
+		updatedDropEntry = latestDropEntry
+		if uint64(requestData.DropNumber) != latestDropEntry.DropNumber {
+			updatedDropEntry, err = fes.GetNFTDropEntry(uint64(requestData.DropNumber))
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf(
+					"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 8"))
+				return
+			}
+		}
+
+		// There are only two possible drops that can be updated (you can't update past drops):
+		//   - The current "active" drop.
+		//   - The next "pending" drop.
+		canUpdateDrop := false
+		latestDropIsPending := latestDropEntry.DropTstampNanos > currentTime
+		if latestDropIsPending && uint64(requestData.DropNumber) >= latestDropEntry.DropNumber-1 {
+			// In this case their is a pending drop so the latest drop and the previous drop are editable.
+			canUpdateDrop = true
+		} else if !latestDropIsPending && uint64(requestData.DropNumber) == latestDropEntry.DropNumber {
+			// In this case there is no pending drop so you can only update the latest drop.
+			canUpdateDrop = true
+		}
+
+		if !canUpdateDrop {
+			_AddBadRequestError(ww, fmt.Sprintf(
+				"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 9"))
+			return
+		}
+
+		// Update IsActive.
+		updatedDropEntry.IsActive = requestData.IsActive
+
+		// Consider updating DropTstampNanos.
+		if uint64(requestData.DropTstampNanos) > currentTime &&
+			uint64(requestData.DropNumber) == latestDropEntry.DropNumber {
+			updatedDropEntry.DropTstampNanos = uint64(requestData.DropTstampNanos)
+
+		} else if uint64(requestData.DropTstampNanos) != updatedDropEntry.DropTstampNanos {
+			_AddBadRequestError(ww, fmt.Sprintf(
+				"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 10"))
+			return
+		}
+
+		utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 11"))
+			return
+		}
+
+		// Add new NFT hashes.
+		if requestData.NFTHashHexToAdd != "" {
+			// Decode the hash and make sure it is a valid NFT so that we can add it to the entry.
+			postHash, err := GetPostHashFromPostHashHex(requestData.NFTHashHexToAdd)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 12"))
+				return
+			}
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if !postEntry.IsNFT {
+				_AddBadRequestError(ww, fmt.Sprintf(
+					"AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 13"))
+				return
+			}
+
+			updatedDropEntry.NFTHashes = append(updatedDropEntry.NFTHashes, postHash)
+		}
+
+	}
+
+	// Set the updated drop entry.
+	globalStateKey := GlobalStateKeyForNFTDropEntry(uint64(requestData.DropNumber))
+	updatedDropEntryBuf := bytes.NewBuffer([]byte{})
+	gob.NewEncoder(updatedDropEntryBuf).Encode(updatedDropEntry)
+	err = fes.GlobalStatePut(globalStateKey, updatedDropEntryBuf.Bytes())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 14"))
+		return
+	}
+
+	// Note that "dropEntryToReturn" can be nil if there are no entries in global state.
+	postEntryResponses, err := fes.GetPostsForNFTDropEntry(updatedDropEntry)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 15"))
+		return
+	}
+
+	// Return all the data associated with the transaction in the response
+	res := AdminUpdateNFTDropResponse{
+		DropEntry: updatedDropEntry,
+		Posts:     postEntryResponses,
+	}
+
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 16"))
+		return
+	}
+}

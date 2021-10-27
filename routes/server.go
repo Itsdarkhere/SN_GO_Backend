@@ -99,7 +99,6 @@ const (
 	RoutePathAcceptNFTBid             = "/api/v0/accept-nft-bid"
 	RoutePathGetNFTBidsForNFTPost     = "/api/v0/get-nft-bids-for-nft-post"
 	RoutePathGetNFTShowcase           = "/api/v0/get-nft-showcase"
-	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
 	RoutePathGetNextNFTShowcase       = "/api/v0/get-next-nft-showcase"
 	RoutePathGetNFTCollectionSummary  = "/api/v0/get-nft-collection-summary"
 	RoutePathGetNFTEntriesForPostHash = "/api/v0/get-nft-entries-for-nft-post"
@@ -202,7 +201,7 @@ const (
 	// admin_nft.go
 	RoutePathAdminGetNFTDrop    = "/api/v0/admin/get-nft-drop"
 	RoutePathAdminUpdateNFTDrop = "/api/v0/admin/update-nft-drop"
-
+	
 	// admin_jumio.go
 	RoutePathAdminResetJumioForPublicKey = "/api/v0/admin/reset-jumio-for-public-key"
 	RoutePathAdminUpdateJumioDeSo        = "/api/v0/admin/update-jumio-deso"
@@ -224,6 +223,12 @@ const (
 	RoutePathAdminUpdateTutorialCreators = "/api/v0/admin/update-tutorial-creators"
 	RoutePathAdminResetTutorialStatus    = "/api/v0/admin/reset-tutorial-status"
 	RoutePathAdminGetTutorialCreators    = "/api/v0/admin/get-tutorial-creators"
+
+	// Custom Supernovas
+	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
+	// Adding to marketplace straight from minting
+	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
+	RoutePathAddToMarketplaceSupernovas = "/api/v0/add-to-marketplace-supernovas"
 )
 
 // APIServer provides the interface between the blockchain and things like the
@@ -651,6 +656,7 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			fes.GetNFTShowcase,
 			PublicAccess,
 		},
+		// Supernovas
 		{
 			"GetNFTShowcaseSupernovas",
 			[]string{"POST", "OPTIONS"},
@@ -658,6 +664,21 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			fes.GetNFTShowcasePlus,
 			PublicAccess,
 		},
+		{
+			"GetMarketplaceRef",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetMarketplaceRefSupernovas,
+			fes.GetMarketplaceRef,
+			PublicAccess,
+		},
+		{
+			"AddToMarketplace",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAddToMarketplaceSupernovas,
+			fes.AddToMarketplace,
+			PublicAccess,
+		},
+		// No longer Supernovas
 		{
 			"GetNextNFTShowcase",
 			[]string{"POST", "OPTIONS"},
