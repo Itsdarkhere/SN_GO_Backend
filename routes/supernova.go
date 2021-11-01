@@ -122,8 +122,7 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 }
 // Addition to regular showcase request is profilepk, to narrow it to only that profiles nfts
 type GetNFTShowcaseRequestProfile struct {
-	ReaderPublicKeyBase58Check string `safeForLogging:"true"`,
-	//Addition
+	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	ProfilePublicKey string `safeForLogging:"true"`
 }
 
@@ -146,14 +145,6 @@ func (fes *APIServer) GetNFTShowcaseProfile(ww http.ResponseWriter, req *http.Re
 		}
 	}
 
-	// Addition
-	if requestData.ProfilePublicKey != "" {
-		profilePublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ProfilePublicKey)
-		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding profile public key: %v", err))
-			return
-		}
-	}
 
 	dropEntry, err := fes.GetLatestNFTDropEntry()
 	if err != nil {
@@ -207,13 +198,8 @@ func (fes *APIServer) GetNFTShowcaseProfile(ww http.ResponseWriter, req *http.Re
 			return
 		}
 
-		// Addition, this should result in returning only NFTs based on a specific PK
-		if postEntry.PosterPublicKeyBase58Check != profilePublicKeyBytes {
-			continue;
-		}
-
 		// Should fix the marketplace, stopped working once burn was implemented
-		if postEntry.NumNFTCopiesBurned != postEntry.NumNFTCopies {
+		if postEntry.NumNFTCopiesBurned == postEntry.NumNFTCopies {
 			continue;
 		}
 
@@ -225,6 +211,10 @@ func (fes *APIServer) GetNFTShowcaseProfile(ww http.ResponseWriter, req *http.Re
 		if err != nil {
 			_AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: Found invalid post entry for NFT hash."))
 			return
+		}
+		// Addition, this should result in returning only NFTs based on a specific PK
+		if postEntryResponse.PosterPublicKeyBase58Check != requestData.ProfilePublicKey {
+			continue;
 		}
 		postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 		nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
