@@ -226,6 +226,8 @@ const (
 
 	// Custom Supernovas
 	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
+	// Get only NFTs from a single PK
+	RoutePathGetNFTShowcaseProfile = "/api/v0/get-nft-showcase-profile"
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
 	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
@@ -662,6 +664,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetNFTShowcaseSupernovas,
 			fes.GetNFTShowcasePlus,
+			PublicAccess,
+		},
+		{
+			"GetNFTShowcaseProfile",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetNFTShowcaseProfile,
+			fes.GetNFTShowcaseProfile,
 			PublicAccess,
 		},
 		{
