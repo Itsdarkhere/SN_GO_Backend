@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
+	"sort"
 	"net/http"
 	"time"	
 
@@ -535,10 +537,10 @@ func (fes *APIServer) GetNFTsForPublicKeySupernovas(ww http.ResponseWriter, req 
 		return
 	}
 	// Loop to get only NFTs: SUPERNOVAS ADDITION
-	var PostEntries []*PostEntry
+	var postEntries []*lib.PostEntry
 	for i := range posts {
 		if posts[i].IsNFT {
-			PostEntries = append(PostEntries, arr[i])
+			postEntries = append(postEntries, posts[i])
 		}
 	}
 	// Make posts contain only the NFTS: SUPERNOVAS ADDITION
