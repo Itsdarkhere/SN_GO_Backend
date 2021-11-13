@@ -75,12 +75,6 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	verifiedMap, err := fes.GetVerifiedUsernameToPKIDMap()
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTBidsForNFTPost: Error getting verified user map: %v", err))
-		return
-	}
-
 	var readerPKID *lib.PKID
 	if requestData.ReaderPublicKeyBase58Check != "" {
 		readerPKID = utxoView.GetPKIDForPublicKey(readerPublicKeyBytes).PKID
@@ -105,7 +99,7 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 				return
 			}
 			postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
-			nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
+			nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, readerPKID)
 			nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponsePlus)
 		}
 	}
@@ -179,12 +173,6 @@ func (fes *APIServer) GetNFTShowcaseProfile(ww http.ResponseWriter, req *http.Re
 		return
 	}
 
-	verifiedMap, err := fes.GetVerifiedUsernameToPKIDMap()
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTBidsForNFTPost: Error getting verified user map: %v", err))
-		return
-	}
-
 	var readerPKID *lib.PKID
 	if requestData.ReaderPublicKeyBase58Check != "" {
 		readerPKID = utxoView.GetPKIDForPublicKey(readerPublicKeyBytes).PKID
@@ -217,7 +205,7 @@ func (fes *APIServer) GetNFTShowcaseProfile(ww http.ResponseWriter, req *http.Re
 			continue;
 		}
 		postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
-		nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, verifiedMap, readerPKID)
+		nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, readerPKID)
 		nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponsePlus)
 	}
 
@@ -236,14 +224,13 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 	posterPublicKey []byte,
 	postEntryResponse *PostEntryResponse,
 	utxoView *lib.UtxoView,
-	verifiedUsernameMap map[string]*lib.PKID,
 	readerPKID *lib.PKID,
 ) *NFTCollectionResponsePlus {
 
 	profileEntry := utxoView.GetProfileEntryForPublicKey(posterPublicKey)
 	var profileEntryResponse *ProfileEntryResponse
 	if profileEntry != nil {
-		profileEntryResponse = _profileEntryToResponse(profileEntry, fes.Params, verifiedUsernameMap, utxoView)
+		profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
 	}
 
 	postEntryResponse.ProfileEntryResponse = profileEntryResponse
@@ -260,7 +247,7 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 			numCopiesForSale++
 		}
 	}
-	nftEntryRes := fes._nftEntryToResponse(nftEntry, nil, utxoView, verifiedUsernameMap, true, readerPKID)
+	nftEntryRes := fes._nftEntryToResponse(nftEntry, nil, utxoView, true, readerPKID)
 
 	highestBidAmountNanos, lowestBidAmountNanos := utxoView.GetHighAndLowBidsForNFTCollection(
 		nftEntry.NFTPostHash)
