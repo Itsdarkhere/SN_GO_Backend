@@ -8,9 +8,145 @@ import (
 	"io"
 	"net/http"
 	"time"	
-
+	"context"
+	"encoding/base64"
+	"os"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/deso-protocol/core/lib"
 )
+const (
+	host     = "65.108.105.40"
+	port     = 65432
+	user     = "supernovas-admin"
+	password = "woebiuwecjlcasc283ryoih"
+	dbname   = "supernovas-deso-db"
+)
+
+type PostResponse struct {
+	post_hash string `db:"post_hash"`
+    poster_public_key string `db:"poster_public_key"`
+    //parent_post_hash string `db:"parent_post_hash"`
+    body string `db:"body"`
+    //reposted_post_hash string `db:"reposted_post_hash"`
+    //quoted_repost bool `db:"quoted_repost"`
+    timestamp int64 `db:"timestamp"`
+    hidden bool `db:"hidden"`
+    like_count int64
+    repost_count int64 `db:"repost_count"`
+    quote_repost_count int64 `db:"quote_repost_count"`
+    diamond_count int64 `db:"diamond_count"`
+    comment_count int64 `db:"comment_count"`
+    pinned bool `db:"pinned"`
+    nft bool `db:"nft"`
+    num_nft_copies int64 `db:"num_nft_copies"`
+    unlockable bool `db:"unlockable"`
+    creator_royalty_basis_points int64 `db:"creator_royalty_basis_points"`
+    coin_royalty_basis_points int64 `db:"coin_royalty_basis_points"`
+    num_nft_copies_for_sale int64 `db:"num_nft_copies_for_sale"`
+    num_nft_copies_burned int64 `db:"num_nft_copies_burned"`
+	extra_data ExtraData `db:"extra_data"`
+}
+type GetCommunityFavouritesResponse struct {
+	CFPosts []*PostResponse
+}
+type ExtraData map[string]string
+
+func base64Encode(str string) string {
+    return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
+func base64Decode(str string) (string) {
+    data, err := base64.StdEncoding.DecodeString(str)
+    if err != nil {
+        return ""
+    }
+    return string(data)
+}
+
+func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	// Addition
+	requestData := GetNFTShowcaseRequestProfile{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Error parsing request body: %v", err))
+		return
+	}
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			return
+		}
+	}
+	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	
+	conn, err := pgxpool.Connect(context.Background(), url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer conn.Close()
+	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
+
+	rows, err := conn.Query(context.Background(),
+		fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+		encode(poster_public_key, 'hex') as poster_public_key, 
+		body, timestamp, hidden, repost_count, quote_repost_count, 
+		pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+		coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts 
+		WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
+		ORDER BY diamond_count desc LIMIT 10`, timeUnix))
+	if err != nil {
+		fmt.Println("ERROR")
+	} else {
+		fmt.Println("QUERY WORKS")
+
+		// carefully deferring Queries closing
+        defer rows.Close()
+
+		var posts []*PostResponse
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.like_count, &post.diamond_count, &post.comment_count, &post.post_hash, 
+				&post.poster_public_key, &post.body, &post.timestamp, &post.hidden, &post.repost_count, 
+				&post.quote_repost_count, &post.pinned, &post.nft, &post.num_nft_copies, &post.unlockable,
+				&post.coin_royalty_basis_points, &post.creator_royalty_basis_points, &post.num_nft_copies_for_sale,
+				&post.num_nft_copies_burned, &post.extra_data)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					fmt.Println("Error while reading user table: ", err)
+					return
+				}
+			if post.extra_data["name"] != "" {
+				post.extra_data["name"] = base64Decode(post.extra_data["name"])
+			}
+			if post.extra_data["category"] != "" {
+				post.extra_data["category"] = base64Decode(post.extra_data["category"])
+			}
+			if post.extra_data["properties"] != "" {
+				post.extra_data["properties"] = base64Decode(post.extra_data["properties"])
+			}
+			fmt.Println(post)
+			posts = append(posts, post)
+        }
+		// Return all the data associated with the transaction in the response
+		res := GetCommunityFavouritesResponse{
+			CFPosts: posts,
+		}
+
+		if err = json.NewEncoder(ww).Encode(res); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem serializing object to JSON: %v", err))
+			return
+		}
+
+	}
+}
 type NFTCollectionResponsePlus struct {
 	NFTEntryResponse       *NFTEntryResponse     `json:",omitempty"`
 	ProfileEntryResponse   *ProfileEntryResponse `json:",omitempty"`
