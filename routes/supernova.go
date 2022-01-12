@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"reflect"
-	"sort"
 	"net/http"
 	"time"	
 
@@ -451,7 +449,7 @@ func (fes *APIServer) AddToMarketplace(ww http.ResponseWriter, req *http.Request
 	globalStateKey := GlobalStateKeyForNFTDropEntry(uint64(requestData.DropNumber))
 	updatedDropEntryBuf := bytes.NewBuffer([]byte{})
 	gob.NewEncoder(updatedDropEntryBuf).Encode(updatedDropEntry)
-	err = fes.GlobalStatePut(globalStateKey, updatedDropEntryBuf.Bytes())
+	err = fes.GlobalState.Put(globalStateKey, updatedDropEntryBuf.Bytes())
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 14"))
 		return
@@ -472,151 +470,6 @@ func (fes *APIServer) AddToMarketplace(ww http.ResponseWriter, req *http.Request
 
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("AddToMarketplace: NFT Minted but adding to marketplace failed, contact Supernovas team for assistance. ERR. 16"))
-		return
-	}
-}
-type GetNFTShowcaseRequestPaginated struct {
-	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
-	PostHashHex                string `safeForLogging:"true"`
-	NumToFetch                 int    `safeForLogging:"true"`
-}
-
-func (fes *APIServer) GetNFTShowcasePaginated(ww http.ResponseWriter, req *http.Request) {
-	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	requestData := GetNFTShowcaseRequestPaginated{}
-	if err := decoder.Decode(&requestData); err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Error parsing request body: %v", err))
-		return
-	}
-
-	var readerPublicKeyBytes []byte
-	var err error
-	if requestData.ReaderPublicKeyBase58Check != "" {
-		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
-		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
-			return
-		}
-	}
-
-	dropEntry, err := fes.GetLatestNFTDropEntry()
-	if err != nil {
-		_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem getting latest drop: %v", err))
-		return
-	}
-
-	currentTime := uint64(time.Now().UnixNano())
-	if dropEntry.DropTstampNanos > currentTime {
-		// In this case, we have found a pending drop. We must go back one drop in order to
-		// get the current active drop.
-		if dropEntry.DropNumber == 1 {
-			// If the pending drop is drop #1, we need to return a blank dropEntry.
-			dropEntry = &NFTDropEntry{}
-		}
-
-		if dropEntry.DropNumber > 1 {
-			dropNumToFetch := dropEntry.DropNumber - 1
-			dropEntry, err = fes.GetNFTDropEntry(dropNumToFetch)
-			if err != nil {
-				_AddInternalServerError(ww, fmt.Sprintf(
-					"GetNFTShowcase: Problem getting drop #%d: %v", dropNumToFetch, err))
-				return
-			}
-		}
-	}
-	// Addition
-	// Check lastPostHash, if null start from the start
-	var startPostHash *lib.BlockHash
-	if requestData.PostHashHex != "" {
-		// Decode the postHash.  This will give us the location where we start our paginated search.
-		startPostHash, err = GetPostHashFromPostHashHex(requestData.PostHashHex)
-		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetPostsStateless: %v", err))
-			return
-		}
-	}
-	// Addition
-	// Check request size, default to 50 posts fetched.
-	numToFetch := 50
-	if requestData.NumToFetch != 0 {
-		numToFetch = requestData.NumToFetch
-	}
-	// Addition
-	// filter collection only to have lastposthash -> next (request size)
-	oneViewOfHashes []*lib.BlockHash
-	if requestData.PostHashHex != "" {
-		foundPost := false
-		index := 0
-		for _, nftHash := range dropEntry.NFTHashes {
-			if index >= numToFetch {
-				break
-			}
-			if foundPost == true {
-				oneViewOfHashes = append(oneViewOfHashes, nftHash)
-				index++
-			}
-			if nftHash == startPostHash {
-				foundPost = true;
-			}
-		}
-	} else {
-		index := 0
-		for _, nftHash := range dropEntry.NFTHashes {
-			if index < numToFetch {
-				oneViewOfHashes = append(oneViewOfHashes, nftHash)
-				index++
-			} else {
-				break;
-			}
-		}
-	}
-
-	// Now that we have the drop entry, fetch the NFTs.
-	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Error getting utxoView: %v", err))
-		return
-	}
-
-	var readerPKID *lib.PKID
-	if requestData.ReaderPublicKeyBase58Check != "" {
-		readerPKID = utxoView.GetPKIDForPublicKey(readerPublicKeyBytes).PKID
-	}
-
-	var nftCollectionResponses []*NFTCollectionResponsePlus
-
-	// Addition
-	for _, nftHash := range oneViewOfHashes {
-		postEntry := utxoView.GetPostEntryForPostHash(nftHash)
-		if postEntry == nil {
-			_AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: Found nil post entry for NFT hash."))
-			return
-		}
-
-		// Should fix the marketplace, stopped working once burn was implemented
-		if postEntry.NumNFTCopiesBurned != postEntry.NumNFTCopies {
-			nftKey := lib.MakeNFTKey(nftHash, 1)
-			nftEntry := utxoView.GetNFTEntryForNFTKey(&nftKey)
-
-			postEntryResponse, err := fes._postEntryToResponse(
-				postEntry, false, fes.Params, utxoView, readerPublicKeyBytes, 2)
-			if err != nil {
-				_AddInternalServerError(ww, fmt.Sprint("GetNFTShowcase: Found invalid post entry for NFT hash."))
-				return
-			}
-			postEntryResponse.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
-			nftCollectionResponsePlus := fes._nftEntryToNFTCollectionResponsePlus(nftEntry, postEntry.PosterPublicKey, postEntryResponse, utxoView, readerPKID)
-			nftCollectionResponses = append(nftCollectionResponses, nftCollectionResponsePlus)
-		}
-	}
-
-	// Return all the data associated with the transaction in the response
-	res := GetNFTShowcaseResponsePlus{
-		NFTCollections: nftCollectionResponses,
-	}
-
-	if err = json.NewEncoder(ww).Encode(res); err != nil {
-		_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem serializing object to JSON: %v", err))
 		return
 	}
 }
