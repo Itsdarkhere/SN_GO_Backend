@@ -68,7 +68,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	// Addition
 	requestData := GetNFTShowcaseRequestProfile{}
 	if err := decoder.Decode(&requestData); err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Error parsing request body: %v", err))
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error parsing request body: %v", err))
 		return
 	}
 	var readerPublicKeyBytes []byte
@@ -76,7 +76,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	if requestData.ReaderPublicKeyBase58Check != "" {
 		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
 		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Problem decoding reader public key: %v", err))
 			return
 		}
 	}
@@ -84,8 +84,8 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	
 	conn, err := pgxpool.Connect(context.Background(), url)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error connecting to database: %v", err))
+		return
 	}
 	defer conn.Close()
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
@@ -99,9 +99,9 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
 		ORDER BY diamond_count desc LIMIT 10`, timeUnix))
 	if err != nil {
-		fmt.Println("ERROR")
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
+		return
 	} else {
-		fmt.Println("QUERY WORKS")
 
 		// carefully deferring Queries closing
         defer rows.Close()
@@ -120,7 +120,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
-					fmt.Println("Error while reading user table: ", err)
+					_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error scanning to struct: %v", err))
 					return
 				}
 			if post.extra_data["name"] != "" {
@@ -141,7 +141,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		}
 
 		if err = json.NewEncoder(ww).Encode(res); err != nil {
-			_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem serializing object to JSON: %v", err))
+			_AddInternalServerError(ww, fmt.Sprintf("GetCommunityFavourites: Problem serializing object to JSON: %v", err))
 			return
 		}
 
