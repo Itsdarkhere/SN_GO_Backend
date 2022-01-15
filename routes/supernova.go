@@ -10,7 +10,6 @@ import (
 	"time"	
 	"context"
 	"encoding/base64"
-	"os"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/deso-protocol/core/lib"
 )
@@ -23,31 +22,45 @@ const (
 )
 
 type PostResponse struct {
-	post_hash string `db:"post_hash"`
-    poster_public_key string `db:"poster_public_key"`
+	Body string `db:"body"`
+	ImageURLs []string
+	VideoURLs []string
+	PostHashHex string `db:"post_hash"`
+    PosterPublicKeyBase58Check string
+	ProfileEntryResponse *ProfileEntryResponse
     //parent_post_hash string `db:"parent_post_hash"`
-    body string `db:"body"`
     //reposted_post_hash string `db:"reposted_post_hash"`
     //quoted_repost bool `db:"quoted_repost"`
-    timestamp int64 `db:"timestamp"`
-    hidden bool `db:"hidden"`
-    like_count int64
-    repost_count int64 `db:"repost_count"`
-    quote_repost_count int64 `db:"quote_repost_count"`
-    diamond_count int64 `db:"diamond_count"`
-    comment_count int64 `db:"comment_count"`
-    pinned bool `db:"pinned"`
-    nft bool `db:"nft"`
-    num_nft_copies int64 `db:"num_nft_copies"`
-    unlockable bool `db:"unlockable"`
-    creator_royalty_basis_points int64 `db:"creator_royalty_basis_points"`
-    coin_royalty_basis_points int64 `db:"coin_royalty_basis_points"`
-    num_nft_copies_for_sale int64 `db:"num_nft_copies_for_sale"`
-    num_nft_copies_burned int64 `db:"num_nft_copies_burned"`
-	extra_data ExtraData `db:"extra_data"`
+    TimestampNanos int64 `db:"timestamp"`
+    IsHidden bool `db:"hidden"`
+    LikeCount int64 `db:"like_count"`
+    RepostCount int64 `db:"repost_count"`
+    QuoteRepostCount int64 `db:"quote_repost_count"`
+    DiamondCount int64 `db:"diamond_count"`
+    CommentCount int64 `db:"comment_count"`
+    IsPinned bool `db:"pinned"`
+    IsNFT bool `db:"nft"`
+    NumNFTCopies int64 `db:"num_nft_copies"`
+    HasUnlockable bool `db:"unlockable"`
+    NFTRoyaltyToCoinBasisPoints int64 `db:"creator_royalty_basis_points"`
+    NFTRoyaltyToCreatorBasisPoints int64 `db:"coin_royalty_basis_points"`
+    NumNFTCopiesForSale int64 `db:"num_nft_copies_for_sale"`
+    NumNFTCopiesBurned int64 `db:"num_nft_copies_burned"`
+	PostExtraData ExtraData `db:"extra_data"`
 }
-type GetCommunityFavouritesResponse struct {
-	CFPosts []*PostResponse
+type PostResponses struct {
+	PostEntryResponse []*PostResponse
+}
+type PPKBytea struct {
+	Poster_public_key []byte `db:"poster_public_key"`
+}
+type Body struct {
+	Body string `db:"body"`
+}
+type BodyParts struct {
+	ImageURLs []string
+	VideoURLs []string
+	Body string
 }
 type ExtraData map[string]string
 
@@ -63,23 +76,20 @@ func base64Decode(str string) (string) {
     return string(data)
 }
 
+func JsonToStruct(data string) BodyParts {
+	s := string(data)
+	bp := BodyParts{}
+	json.Unmarshal([]byte(s), &bp)
+	return bp
+}
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	// Addition
-	requestData := GetNFTShowcaseRequestProfile{}
+	requestData := GetNFTShowcaseRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error parsing request body: %v", err))
 		return
 	}
-	var readerPublicKeyBytes []byte
-	var err error
-	if requestData.ReaderPublicKeyBase58Check != "" {
-		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
-		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Problem decoding reader public key: %v", err))
-			return
-		}
-	}
+
 	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
 	
 	conn, err := pgxpool.Connect(context.Background(), url)
@@ -91,18 +101,17 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
 	rows, err := conn.Query(context.Background(),
-		fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
-		encode(poster_public_key, 'hex') as poster_public_key, 
-		body, timestamp, hidden, repost_count, quote_repost_count, 
-		pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-		coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts 
-		WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
-		ORDER BY diamond_count desc LIMIT 10`, timeUnix))
+	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, 
+	body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
+	ORDER BY diamond_count desc LIMIT 10`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
 		return
 	} else {
-
 		// carefully deferring Queries closing
         defer rows.Close()
 
@@ -111,36 +120,74 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
         for rows.Next() {
 			// New post to insert values into
 			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
             // Scan reads the values from the current row into tmp
-            rows.Scan(&post.like_count, &post.diamond_count, &post.comment_count, &post.post_hash, 
-				&post.poster_public_key, &post.body, &post.timestamp, &post.hidden, &post.repost_count, 
-				&post.quote_repost_count, &post.pinned, &post.nft, &post.num_nft_copies, &post.unlockable,
-				&post.coin_royalty_basis_points, &post.creator_royalty_basis_points, &post.num_nft_copies_for_sale,
-				&post.num_nft_copies_burned, &post.extra_data)
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
 					_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error scanning to struct: %v", err))
 					return
 				}
-			if post.extra_data["name"] != "" {
-				post.extra_data["name"] = base64Decode(post.extra_data["name"])
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
 			}
-			if post.extra_data["category"] != "" {
-				post.extra_data["category"] = base64Decode(post.extra_data["category"])
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
 			}
-			if post.extra_data["properties"] != "" {
-				post.extra_data["properties"] = base64Decode(post.extra_data["properties"])
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
 			}
-			fmt.Println(post)
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourite: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Append to array for returning
 			posts = append(posts, post)
         }
-		// Return all the data associated with the transaction in the response
-		res := GetCommunityFavouritesResponse{
-			CFPosts: posts,
-		}
 
-		if err = json.NewEncoder(ww).Encode(res); err != nil {
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetCommunityFavourites: Problem serializing object to JSON: %v", err))
 			return
 		}
