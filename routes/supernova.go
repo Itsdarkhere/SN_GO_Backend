@@ -19,6 +19,17 @@ const (
 	user     = "supernovas-admin"
 	password = "woebiuwecjlcasc283ryoih"
 	dbname   = "supernovas-deso-db"
+	categoryArt = "extra_data->>'category' = 'QXJ0' AND"
+	categoryCollectibles = "extra_data->>'category' = 'Q29sbGVjdGlibGVz' AND"
+	categoryGenerativeArt = "extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ=' AND"
+	categoryMetaverseGaming = "extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n' AND"
+	categoryMusic = "extra_data->>'category' = 'TXVzaWM=' AND"
+	categoryProfilePicture = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
+	categoryPhotography = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
+	categoryImage = "extra_data->>'arweaveAudioSrc' = '' AND ImageURLs != '' AND"
+	categoryVideo = "extra_data->>'arweaveVideoSrc' != '' AND"
+	categoryAudio = "extra_data->>'arweaveAudioSrc' != '' AND"
+	categoryFreshDrops = ""
 )
 
 type PostResponse struct {
@@ -315,6 +326,170 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetFreshDrops: Problem serializing object to JSON: %v", err))
+			return
+		}
+
+	}
+}
+type GetNFTsByCategoryRequest struct {
+	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
+	Category string `safeForLogging:"true"`
+	Offset int64 `safeForLogging:"true"`
+}
+func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetNFTsByCategoryRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error parsing request body: %v", err))
+		return
+	}
+
+	var categoryString string
+	if requestData.Category = nil {
+		// Which is empty but this could still be used to do something
+		categoryString = categoryFreshDrops
+	}
+
+	switch categoryString {
+		case "art":
+			categoryString = categoryArt
+		case "collectibles":
+			categoryString = categoryCollectibles
+		case "generative":
+			categoryString = categoryGenerativeArt
+		case "metaverse":
+			categoryString = categoryMetaverseGaming
+		case "music":
+			categoryString = categoryMusic
+		case "profilepic":
+			categoryString = categoryProfilePicture
+		case "photography":
+			categoryString = categoryPhotography
+		case "fresh":
+			categoryString = categoryFreshDrops
+		case "image":
+			categoryString = categoryImage
+		case "video":
+			categoryString = categoryVideo
+		case "audio":
+			categoryString = categoryAudio
+		default:
+			return nil, fmt.Errorf("GetNFTsByCategory: Invalid filter type: %v", categoryString)
+	}
+
+	var offset int64
+	if requestData.Offset = nil {
+		offset = 0
+	}
+
+	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	
+	conn, err := pgxpool.Connect(context.Background(), url)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error connecting to database: %v", err))
+		return
+	}
+	defer conn.Close()
+	// Combining this and the lower one def is something to do
+	queryString := fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, 
+	body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	WHERE extra_data->>'Node' = 'OQ==' AND %+v hidden = false AND nft = true 
+	AND num_nft_copies != num_nft_copies_burned
+	ORDER BY timestamp desc`, categoryString)
+	// So this
+	queryString = queryString + fmt.Sprintf(" OFFSET %+v LIMIT 30", offset)
+
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error query failed: %v", err))
+		return
+	} else {
+		// carefully deferring Queries closing
+        defer rows.Close()
+
+		var posts []*PostResponse
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error scanning to struct: %v", err))
+					return
+				}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			if post.PostExtraData["arweaveVideoSrc"] != "" {
+				post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+			}
+			if post.PostExtraData["arweaveAudioSrc"] != "" {
+				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetNFTsByCategory: Problem serializing object to JSON: %v", err))
 			return
 		}
 
