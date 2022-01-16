@@ -26,10 +26,11 @@ const (
 	categoryMusic = "extra_data->>'category' = 'TXVzaWM=' AND"
 	categoryProfilePicture = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
 	categoryPhotography = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
-	categoryImage = "extra_data->>'arweaveAudioSrc' = '' AND ImageURLs != '' AND"
+	categoryImage = "extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL AND"
 	categoryVideo = "extra_data->>'arweaveVideoSrc' != '' AND"
 	categoryAudio = "extra_data->>'arweaveAudioSrc' != '' AND"
 	categoryFreshDrops = ""
+	categoryCommunityFavourites = "true"
 )
 
 type PostResponse struct {
@@ -367,6 +368,8 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			categoryString = categoryPhotography
 		case "fresh":
 			categoryString = categoryFreshDrops
+		case "communityfavourites":
+			categoryString = categoryCommunityFavourites
 		case "image":
 			categoryString = categoryImage
 		case "video":
@@ -391,14 +394,27 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	}
 	defer conn.Close()
 	// Combining this and the lower one def is something to do
-	queryString := fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
-	poster_public_key, 
-	body, timestamp, hidden, repost_count, quote_repost_count, 
-	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
-	WHERE extra_data->>'Node' = 'OQ==' AND %+v hidden = false AND nft = true 
-	AND num_nft_copies != num_nft_copies_burned
-	ORDER BY timestamp desc`, categoryString)
+	var queryString string
+	// IF categoryString is true Order based on diamond count, this is only in communityFavourites
+	if categoryString == "true" {
+		queryString = `SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+		poster_public_key, 
+		body, timestamp, hidden, repost_count, quote_repost_count, 
+		pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+		coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+		WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true 
+		AND num_nft_copies != num_nft_copies_burned
+		ORDER BY diamond_count desc`
+	} else {
+		queryString = fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+		poster_public_key, 
+		body, timestamp, hidden, repost_count, quote_repost_count, 
+		pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+		coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+		WHERE extra_data->>'Node' = 'OQ==' AND %+v hidden = false AND nft = true 
+		AND num_nft_copies != num_nft_copies_burned
+		ORDER BY timestamp desc`, categoryString)
+	}
 	// So this
 	queryString = queryString + fmt.Sprintf(" OFFSET %+v LIMIT 30", offset)
 
