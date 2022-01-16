@@ -345,10 +345,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	}
 
 	var categoryString string
-	if requestData.Category = nil {
-		// Which is empty but this could still be used to do something
-		categoryString = categoryFreshDrops
-	}
+	categoryString = requestData.Category
 
 	switch categoryString {
 		case "art":
@@ -374,11 +371,14 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		case "audio":
 			categoryString = categoryAudio
 		default:
-			return nil, fmt.Errorf("GetNFTsByCategory: Invalid filter type: %v", categoryString)
+			_AddBadRequestError(ww, "GetNFTsByCategory: Error invalid category type")
+			return
 	}
 
 	var offset int64
-	if requestData.Offset = nil {
+	if requestData.Offset >= 0 {
+		offset = requestData.Offset
+	} else {
 		offset = 0
 	}
 
