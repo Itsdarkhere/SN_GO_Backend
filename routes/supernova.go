@@ -121,7 +121,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
 	WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
 	AND num_nft_copies != num_nft_copies_burned
-	ORDER BY diamond_count, like_count, comment_count desc LIMIT 10`, timeUnix))
+	ORDER BY diamond_count desc, like_count desc, comment_count desc LIMIT 10`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
 		return
@@ -395,7 +395,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
 		WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true 
 		AND num_nft_copies != num_nft_copies_burned
-		ORDER BY diamond_count, like_count, comment_count desc`
+		ORDER BY diamond_count desc, like_count desc, comment_count desc`
 	} else {
 		queryString = fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 		poster_public_key, 

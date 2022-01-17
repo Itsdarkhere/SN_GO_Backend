@@ -1091,7 +1091,7 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathAdminGetVerifiedUsers,
 			fes.AdminGetVerifiedUsers,
-			AdminAccess, // Check Secret
+			PublicAccess, // Check Secret
 		},
 		{
 			"AdminGetAllUserGlobalMetadata",
