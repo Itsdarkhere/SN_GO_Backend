@@ -24,8 +24,8 @@ const (
 	categoryGenerativeArt = "extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ=' AND"
 	categoryMetaverseGaming = "extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n' AND"
 	categoryMusic = "extra_data->>'category' = 'TXVzaWM=' AND"
-	categoryProfilePicture = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
-	categoryPhotography = "extra_data->>'category' != 'UGhvdG9ncmFwaHk=' AND"
+	categoryProfilePicture = "extra_data->>'category' = 'UHJvZmlsZSBQaWN0dXJl' AND"
+	categoryPhotography = "extra_data->>'category' = 'UGhvdG9ncmFwaHk=' AND"
 	categoryImage = "extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL AND"
 	categoryVideo = "extra_data->>'arweaveVideoSrc' != '' AND"
 	categoryAudio = "extra_data->>'arweaveAudioSrc' != '' AND"
@@ -94,6 +94,13 @@ func JsonToStruct(data string) BodyParts {
 	json.Unmarshal([]byte(s), &bp)
 	return bp
 }
+func CustomConnect() (*pgxpool.Pool) {
+	DATABASE_URL := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	config, _ := pgxpool.ParseConfig(DATABASE_URL)
+	conn, _ := pgxpool.ConnectConfig(context.Background(), config)
+	return conn
+}
+
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := GetNFTShowcaseRequest{}
@@ -101,15 +108,9 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error parsing request body: %v", err))
 		return
 	}
+	// Get database connection
+	conn := CustomConnect()
 
-	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
-	
-	conn, err := pgxpool.Connect(context.Background(), url)
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error connecting to database: %v", err))
-		return
-	}
-	defer conn.Close()
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
 	rows, err := conn.Query(context.Background(),
@@ -221,14 +222,9 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
-	
-	conn, err := pgxpool.Connect(context.Background(), url)
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error connecting to database: %v", err))
-		return
-	}
-	defer conn.Close()
+	// Get database connection
+	conn := CustomConnect()
+
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
 	rows, err := conn.Query(context.Background(),
@@ -385,14 +381,9 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		offset = 0
 	}
 
-	url := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
-	
-	conn, err := pgxpool.Connect(context.Background(), url)
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error connecting to database: %v", err))
-		return
-	}
-	defer conn.Close()
+	// Get database connection
+	conn := CustomConnect()
+
 	// Combining this and the lower one def is something to do
 	var queryString string
 	// IF categoryString is true Order based on diamond count, this is only in communityFavourites
