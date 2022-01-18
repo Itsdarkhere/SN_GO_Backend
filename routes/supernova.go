@@ -95,11 +95,14 @@ func JsonToStruct(data string) BodyParts {
 	return bp
 }
 func CustomConnect() (*pgxpool.Pool) {
-	DATABASE_URL := "postgres://supernovas-admin:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
 	config, _ := pgxpool.ParseConfig(DATABASE_URL)
 	conn, _ := pgxpool.ConnectConfig(context.Background(), config)
 	return conn
 }
+
+// Open and store the database connection
+var connection = CustomConnect()
 
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -109,8 +112,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		return
 	}
 	// Get database connection
-	conn := CustomConnect()
-	defer conn.Close()
+	conn := connection.Acquire(context.Background())
 
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
@@ -125,12 +127,17 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	ORDER BY diamond_count desc, like_count desc, comment_count desc LIMIT 10`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
+		conn.Release()
 		return
 	} else {
 		// carefully deferring Queries closing
         defer rows.Close()
 
 		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
         // Next prepares the next row for reading.
         for rows.Next() {
 			// New post to insert values into
@@ -149,6 +156,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
 					_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error scanning to struct: %v", err))
+					conn.Release()
 					return
 				}
 			if post.PostExtraData["name"] != "" {
@@ -179,6 +187,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
 			if err != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourite: Error getting utxoView: %v", err))
+				conn.Release()
 				return
 			}
 
@@ -210,9 +219,10 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetCommunityFavourites: Problem serializing object to JSON: %v", err))
+			conn.Release()
 			return
 		}
-
+		conn.Release()
 	}
 }
 func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
@@ -224,8 +234,7 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	}
 
 	// Get database connection
-	conn := CustomConnect()
-	defer conn.Close()
+	conn := connection.Acquire(context.Background())
 
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
@@ -240,12 +249,17 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	ORDER BY timestamp desc LIMIT 8`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error query failed: %v", err))
+		conn.Release()
 		return
 	} else {
 		// carefully deferring Queries closing
         defer rows.Close()
 
 		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
         // Next prepares the next row for reading.
         for rows.Next() {
 			// New post to insert values into
@@ -294,6 +308,7 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
 			if err != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error getting utxoView: %v", err))
+				conn.Release()
 				return
 			}
 
@@ -325,9 +340,10 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetFreshDrops: Problem serializing object to JSON: %v", err))
+			conn.Release()
 			return
 		}
-
+		conn.Release()
 	}
 }
 type GetNFTsByCategoryRequest struct {
@@ -384,8 +400,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	}
 
 	// Get database connection
-	conn := CustomConnect()
-	defer conn.Close()
+	conn := connection.Acquire(context.Background())
 
 	// Combining this and the lower one def is something to do
 	var queryString string
@@ -415,12 +430,16 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error query failed: %v", err))
+		conn.Release()
 		return
 	} else {
 		// carefully deferring Queries closing
-        defer rows.Close()
 
 		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
         // Next prepares the next row for reading.
         for rows.Next() {
 			// New post to insert values into
@@ -439,6 +458,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
 					_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error scanning to struct: %v", err))
+					conn.Release()
 					return
 				}
 			if post.PostExtraData["name"] != "" {
@@ -469,6 +489,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
 			if err != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error getting utxoView: %v", err))
+				conn.Release()
 				return
 			}
 
@@ -500,9 +521,10 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetNFTsByCategory: Problem serializing object to JSON: %v", err))
+			conn.Release()
 			return
 		}
-
+		conn.Release()
 	}
 }
 type NFTCollectionResponsePlus struct {
