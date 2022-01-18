@@ -235,8 +235,7 @@ const (
 	RoutePathGetCommunityFavourites = "/api/v0/get-community-favourites"
 	RoutePathGetFreshDrops = "/api/v0/get-fresh-drops"
 	RoutePathGetNFTsByCategory = "/api/v0/get-nfts-by-category"
-	// Get only NFTs from a single PK
-	RoutePathGetNFTShowcaseProfile = "/api/v0/get-nft-showcase-profile"
+
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
 	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
@@ -733,13 +732,6 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetNFTsByCategory,
 			fes.GetNFTsByCategory,
-			PublicAccess,
-		},
-		{
-			"GetNFTShowcaseProfile",
-			[]string{"POST", "OPTIONS"},
-			RoutePathGetNFTShowcaseProfile,
-			fes.GetNFTShowcaseProfile,
 			PublicAccess,
 		},
 		{
