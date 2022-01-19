@@ -95,24 +95,30 @@ func JsonToStruct(data string) BodyParts {
 	return bp
 }
 
-// Use this to make sure we dont create multiple connection pools
-var url string
 // Connection pool
 var pool *pgxpool.Pool
 
-func CustomConnect() (*pgxpool.Pool) {
-	// Create pool if has not been created
-	if url == "" {
-		DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
-		url = "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
-		config, _ := pgxpool.ParseConfig(DATABASE_URL)
-		pool, _ = pgxpool.ConnectConfig(context.Background(), config)
+func CustomConnect() (*pgxpool.Pool, error) {
+	// If we have a pool just return
+	if pool != nil {
+		return pool, nil
 	}
-	return pool
+	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	config, err := pgxpool.ParseConfig(DATABASE_URL)
+	if err != nil {
+		return nil, err
+	}
+	// Configs
+	config.MaxConnIdleTime = 120 * time.Second
+	config.HealthCheckPeriod = 120 * time.Second
+	config.MaxConnIdleTime = 5 * time.Minute
+	// setting pool
+	pool, err = pgxpool.ConnectConfig(context.Background(), config)
+	if err != nil {
+        return nil, err
+    }
+	return pool, nil
 }
-
-// Open and store the database connection pool
-var connection = CustomConnect()
 
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -121,8 +127,14 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error parsing request body: %v", err))
 		return
 	}
-	// Get database connection
-	conn := connection.Acquire(context.Background())
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -243,8 +255,14 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Get database connection
-	conn := connection.Acquire(context.Background())
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -408,8 +426,14 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		offset = 0
 	}
 
-	// Get database connection
-	conn := connection.Acquire(context.Background())
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
