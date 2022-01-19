@@ -101,7 +101,7 @@ func CustomConnect() (*pgxpool.Pool) {
 	return conn
 }
 
-// Open and store the database connection
+// Open and store the database connection pool
 var connection = CustomConnect()
 
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
@@ -112,7 +112,12 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		return
 	}
 	// Get database connection
-	conn := connection.Acquire(context.Background())
+	conn, err := connection.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
@@ -234,7 +239,12 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	}
 
 	// Get database connection
-	conn := connection.Acquire(context.Background())
+	conn, err := connection.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
@@ -400,7 +410,12 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	}
 
 	// Get database connection
-	conn := connection.Acquire(context.Background())
+	conn, err := connection.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	// Combining this and the lower one def is something to do
 	var queryString string
