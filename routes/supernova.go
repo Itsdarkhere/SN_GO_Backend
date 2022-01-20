@@ -566,7 +566,10 @@ type NFTCollectionResponsePlus struct {
 	PostEntryResponse      *PostEntryResponse    `json:",omitempty"`
 	HighestBidAmountNanos  uint64                `safeForLogging:"true"`
 	LowestBidAmountNanos   uint64                `safeForLogging:"true"`
+	HighestBuyNowPriceNanos *uint64               `safeForLogging:"true"`
+	LowestBuyNowPriceNanos  *uint64               `safeForLogging:"true"`
 	NumCopiesForSale       uint64                `safeForLogging:"true"`
+	NumCopiesBuyNow         uint64                `safeForLogging:"true"`
 	AvailableSerialNumbers []uint64              `safeForLogging:"true"`
 }
 type GetNFTShowcaseResponsePlus struct {
@@ -663,6 +666,33 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 		return
 	}
 }
+func (fes *APIServer) _nftEntryToNFTCollectionResponse(
+	nftEntry *lib.NFTEntry,
+	posterPublicKey []byte,
+	postEntryResponse *PostEntryResponse,
+	utxoView *lib.UtxoView,
+	readerPKID *lib.PKID,
+) *NFTCollectionResponse {
+	var numCopiesForSale uint64
+	var numCopiesBuyNow uint64
+	var highBuyNowPriceNanos *uint64
+	var lowBuyNowPriceNanos *uint64
+
+	highestBidAmountNanos, lowestBidAmountNanos := utxoView.GetHighAndLowBidsForNFTCollection(
+		nftEntry.NFTPostHash)
+
+	return &NFTCollectionResponse{
+		ProfileEntryResponse:    profileEntryResponse,
+		PostEntryResponse:       postEntryResponse,
+		HighestBidAmountNanos:   highestBidAmountNanos,
+		LowestBidAmountNanos:    lowestBidAmountNanos,
+		HighestBuyNowPriceNanos: highBuyNowPriceNanos,
+		LowestBuyNowPriceNanos:  lowBuyNowPriceNanos,
+		NumCopiesForSale:        numCopiesForSale,
+		NumCopiesBuyNow:         numCopiesBuyNow,
+		AvailableSerialNumbers:  serialNumbersForSale,
+	}
+}
 func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 	nftEntry *lib.NFTEntry,
 	posterPublicKey []byte,
@@ -680,6 +710,9 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 	postEntryResponse.ProfileEntryResponse = profileEntryResponse
 
 	var numCopiesForSale uint64
+	var numCopiesBuyNow uint64
+	var highBuyNowPriceNanos *uint64
+	var lowBuyNowPriceNanos *uint64
 	serialNumbersForSale := []uint64{}
 	for ii := uint64(1); ii <= postEntryResponse.NumNFTCopies; ii++ {
 		nftKey := lib.MakeNFTKey(nftEntry.NFTPostHash, ii)
@@ -687,6 +720,17 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 		if nftEntryii != nil && nftEntryii.IsForSale {
 			if nftEntryii.OwnerPKID != readerPKID {
 				serialNumbersForSale = append(serialNumbersForSale, ii)
+				if nftEntryii.IsBuyNow {
+					if highBuyNowPriceNanos == nil || nftEntryii.BuyNowPriceNanos > *highBuyNowPriceNanos {
+						highBuyNowPriceNanos = &nftEntryii.BuyNowPriceNanos
+					}
+					if lowBuyNowPriceNanos == nil || nftEntryii.BuyNowPriceNanos < *lowBuyNowPriceNanos {
+						lowBuyNowPriceNanos = &nftEntryii.BuyNowPriceNanos
+					}
+				}
+			}
+			if nftEntryii.IsBuyNow {
+				numCopiesBuyNow++
 			}
 			numCopiesForSale++
 		}
@@ -702,7 +746,10 @@ func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
 		PostEntryResponse:      postEntryResponse,
 		HighestBidAmountNanos:  highestBidAmountNanos,
 		LowestBidAmountNanos:   lowestBidAmountNanos,
+		HighestBuyNowPriceNanos: highBuyNowPriceNanos,
+		LowestBuyNowPriceNanos:  lowBuyNowPriceNanos,
 		NumCopiesForSale:       numCopiesForSale,
+		NumCopiesBuyNow:         numCopiesBuyNow,
 		AvailableSerialNumbers: serialNumbersForSale,
 	}
 }
