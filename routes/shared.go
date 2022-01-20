@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
 	"net/http"
 	"time"
 
@@ -114,9 +115,9 @@ type User struct {
 	// JumioFinishedTime = Time user completed flow in Jumio
 	JumioFinishedTime uint64
 	// JumioVerified = user was verified from Jumio flow
-	JumioVerified    bool
+	JumioVerified bool
 	// JumioReturned = jumio webhook called
-	JumioReturned    bool
+	JumioReturned bool
 
 	// Is this user an admin
 	IsAdmin bool
@@ -151,27 +152,15 @@ type BalanceEntryResponse struct {
 
 	// How much this HODLer owns of a particular creator coin.
 	BalanceNanos uint64
+
+	// For simplicity, we create a new field for the uint256 balance for DAO coins
+	BalanceNanosUint256 uint256.Int
+
 	// The net effect of transactions in the mempool on a given BalanceEntry's BalanceNanos.
 	// This is used by the frontend to convey info about mining.
 	NetBalanceInMempool int64
 
 	ProfileEntryResponse *ProfileEntryResponse `json:",omitempty"`
-}
-
-func (fes *APIServer) GetBalanceForPublicKey(publicKeyBytes []byte) (
-	_balanceNanos uint64, _err error) {
-
-	// Get the UtxoEntries from the augmented view
-	utxoEntries, err := fes.blockchain.GetSpendableUtxosForPublicKey(publicKeyBytes, fes.backendServer.GetMempool(), nil)
-	if err != nil {
-		return 0, fmt.Errorf(
-			"GetBalanceForPublicKey: Problem getting utxos from view: %v", err)
-	}
-	totalBalanceNanos := uint64(0)
-	for _, utxoEntry := range utxoEntries {
-		totalBalanceNanos += utxoEntry.AmountNanos
-	}
-	return totalBalanceNanos, nil
 }
 
 // GetVerifiedUsernameToPKIDMapFromGlobalState
@@ -365,4 +354,16 @@ func (fes *APIServer) SendSeedDeSo(recipientPkBytes []byte, amountNanos uint64, 
 		}
 	}
 	return hash, err
+}
+
+func (fes *APIServer) AddNodeSourceToTxnMetadata (txn *lib.MsgDeSoTxn) {
+	if fes.Config.NodeSource != 0 {
+		if len(txn.ExtraData) == 0 {
+			txnExtraData := make(map[string][]byte)
+			txnExtraData[lib.NodeSourceMapKey] = lib.UintToBuf(fes.Config.NodeSource)
+			txn.ExtraData = txnExtraData
+		} else {
+			txn.ExtraData[lib.NodeSourceMapKey] = lib.UintToBuf(fes.Config.NodeSource)
+		}
+	}
 }
