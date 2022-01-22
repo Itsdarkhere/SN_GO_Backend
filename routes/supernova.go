@@ -134,7 +134,7 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -262,7 +262,7 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -433,7 +433,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -664,33 +664,6 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem serializing object to JSON: %v", err))
 		return
-	}
-}
-func (fes *APIServer) _nftEntryToNFTCollectionResponse(
-	nftEntry *lib.NFTEntry,
-	posterPublicKey []byte,
-	postEntryResponse *PostEntryResponse,
-	utxoView *lib.UtxoView,
-	readerPKID *lib.PKID,
-) *NFTCollectionResponse {
-	var numCopiesForSale uint64
-	var numCopiesBuyNow uint64
-	var highBuyNowPriceNanos *uint64
-	var lowBuyNowPriceNanos *uint64
-
-	highestBidAmountNanos, lowestBidAmountNanos := utxoView.GetHighAndLowBidsForNFTCollection(
-		nftEntry.NFTPostHash)
-
-	return &NFTCollectionResponse{
-		ProfileEntryResponse:    profileEntryResponse,
-		PostEntryResponse:       postEntryResponse,
-		HighestBidAmountNanos:   highestBidAmountNanos,
-		LowestBidAmountNanos:    lowestBidAmountNanos,
-		HighestBuyNowPriceNanos: highBuyNowPriceNanos,
-		LowestBuyNowPriceNanos:  lowBuyNowPriceNanos,
-		NumCopiesForSale:        numCopiesForSale,
-		NumCopiesBuyNow:         numCopiesBuyNow,
-		AvailableSerialNumbers:  serialNumbersForSale,
 	}
 }
 func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
