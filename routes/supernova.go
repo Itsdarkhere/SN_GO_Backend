@@ -136,14 +136,11 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	}
 	// get connection to pool
 	conn, err := dbPool.Acquire(context.Background())
-<<<<<<< HEAD
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
 		conn.Release()
 		return
 	}
-=======
->>>>>>> 4ca9cff1cec3ab60139a369883b5cc741ab18db6
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -271,14 +268,11 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	}
 	// get connection to pool
 	conn, err := dbPool.Acquire(context.Background())
-<<<<<<< HEAD
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
 		conn.Release()
 		return
 	}
-=======
->>>>>>> 4ca9cff1cec3ab60139a369883b5cc741ab18db6
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -449,14 +443,11 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	}
 	// get connection to pool
 	conn, err := dbPool.Acquire(context.Background())
-<<<<<<< HEAD
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
 		conn.Release()
 		return
 	}
-=======
->>>>>>> 4ca9cff1cec3ab60139a369883b5cc741ab18db6
 
 	// Release connection once function returns
 	defer conn.Release();
