@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
 	"io"
 	"math/big"
 	"net/http"
@@ -416,6 +417,9 @@ func (fes *APIServer) UpdateProfile(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateProfile: Problem serializing transaction: %v", err))
@@ -750,7 +754,7 @@ func (fes *APIServer) ExchangeBitcoinStateless(ww http.ResponseWriter, req *http
 
 	var desoTxnHash *lib.BlockHash
 	if requestData.Broadcast {
-		glog.Infof("ExchangeBitcoinStateless: Broadcasting Bitcoin txn: %v", bitcoinTxn)
+		glog.Infof("ExchangeBitcoinStateless: Broadcasting Bitcoin txn: %v", bitcoinTxn.TxHash())
 
 		// Check whether the deposits being used to construct this transaction have RBF enabled.
 		// If they do then we force the user to wait until those deposits have been mined into a
@@ -793,10 +797,50 @@ func (fes *APIServer) ExchangeBitcoinStateless(ww http.ResponseWriter, req *http
 		// use Bitcoin nodes to do it. Note that BLockCypher tends to be the more reliable path.
 		if fes.BlockCypherAPIKey != "" {
 			// Push the transaction to BlockCypher and ensure no error occurs.
-			if err = lib.BlockCypherPushAndWaitForTxn(
+			if isDoubleSpend, err := lib.BlockCypherPushAndWaitForTxn(
 				hex.EncodeToString(bitcoinTxnBytes), &bitcoinTxnHash,
 				fes.BlockCypherAPIKey, fes.Params.BitcoinDoubleSpendWaitSeconds,
 				fes.Params); err != nil {
+
+				if !isDoubleSpend {
+					_AddBadRequestError(ww, fmt.Sprintf("ExchangeBitcoinStateless: Error broadcasting "+
+						"transaction - not double spend: %v", err))
+					return
+				}
+				// If we hit an error, kick off a goroutine to retry this txn every
+				// minute for a few hours.
+				//
+				// TODO: This code is very ugly and highly error-prone. If you write it
+				// incorrectly, it will send infinite money to someone. Don't change it
+				// unless you absolutely have to...
+				go func() {
+					endTime := time.Now().Add(3 * time.Hour)
+					for time.Now().Before(endTime) {
+						err = lib.CheckBitcoinDoubleSpend(
+							&bitcoinTxnHash, fes.BlockCypherAPIKey, fes.Params)
+						if err == nil {
+							// If we get here then it means the txn *finally* worked. Blast
+							// out the DESO in this case and return.
+							glog.Infof("Eventually mined Bitcoin txn %v. Sending DESO...", bitcoinTxnHash)
+							desoTxnHash, err = fes.SendSeedDeSo(pkBytes, nanosPurchased, true)
+							if err != nil {
+								glog.Errorf("Error sending DESO for Bitcoin txn %v", bitcoinTxnHash)
+							}
+							// Note that if we don't return we'll send money to this person infinitely...
+							return
+						} else {
+							glog.Infof("Error when re-checking double-spend for Bitcoin txn %v: %v", bitcoinTxnHash, err)
+						}
+
+						// Sleep for a bit each time.
+						glog.Infof("Sleeping for 1 minute while waiting for Bitcoin "+
+							"txn %v to mine...", bitcoinTxnHash)
+						sleepTime := time.Minute
+						time.Sleep(sleepTime)
+					}
+					glog.Infof("Bitcoin txn %v did not end up mining after several hours", bitcoinTxnHash)
+				}()
+
 				_AddBadRequestError(ww, fmt.Sprintf("ExchangeBitcoinStateless: Error broadcasting transaction: %v", err))
 				return
 			}
@@ -867,6 +911,11 @@ func (fes *APIServer) GetNanosFromUSDCents(usdCents float64, feeBasisPoints uint
 	conversionRateAfterFee := float64(usdCentsPerDeSo) * (1 + (float64(feeBasisPoints) / (100.0 * 100.0)))
 	nanosPurchased := uint64(usdCents * float64(lib.NanosPerUnit) / conversionRateAfterFee)
 	return nanosPurchased
+}
+
+func (fes *APIServer) GetUSDFromNanos(nanos uint64) float64 {
+	usdCentsPerDeSo := float64(fes.UsdCentsPerDeSoExchangeRate)
+	return usdCentsPerDeSo * float64(nanos/lib.NanosPerUnit) / 100
 }
 
 // ExceedsSendDeSoBalance - Check if nanosPurchased is greater than the balance of the BuyDESO wallet.
@@ -1133,6 +1182,9 @@ func (fes *APIServer) CreateLikeStateless(ww http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("CreateLikeStateless: Problem serializing transaction: %v", err))
@@ -1366,6 +1418,9 @@ func (fes *APIServer) SubmitPost(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SubmitPost: Problem serializing transaction: %v", err))
@@ -1515,6 +1570,9 @@ func (fes *APIServer) CreateFollowTxnStateless(ww http.ResponseWriter, req *http
 		_AddBadRequestError(ww, fmt.Sprintf("CreateFollowTxnStateless: Problem creating transaction: %v", err))
 		return
 	}
+
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
 
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
@@ -1687,6 +1745,9 @@ func (fes *APIServer) BuyOrSellCreatorCoin(ww http.ResponseWriter, req *http.Req
 		return
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	utxoView, err := fes.mempool.GetAugmentedUtxoViewForPublicKey(updaterPublicKeyBytes, txn)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("BuyOrSellCreatorCoin: Problem computing view for transaction: %v", err))
@@ -1820,7 +1881,7 @@ func (fes *APIServer) BuyOrSellCreatorCoin(ww http.ResponseWriter, req *http.Req
 		TxnHashHex:        txn.Hash().String(),
 	}
 	if err := json.NewEncoder(ww).Encode(res); err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendMessage: Problem encoding response as JSON: %v", err))
+		_AddBadRequestError(ww, fmt.Sprintf("BuyOrSellCreatorCoin: Problem encoding response as JSON: %v", err))
 		return
 	}
 }
@@ -1948,6 +2009,9 @@ func (fes *APIServer) TransferCreatorCoin(ww http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("TransferCreatorCoin: Problem serializing transaction: %v", err))
@@ -2069,7 +2133,7 @@ func (fes *APIServer) SendDiamonds(ww http.ResponseWriter, req *http.Request) {
 	var changeAmount uint64
 	var fees uint64
 	var additionalOutputs []*lib.DeSoOutput
-	if blockHeight > lib.DeSoDiamondsBlockHeight {
+	if blockHeight > fes.Params.ForkHeights.DeSoDiamondsBlockHeight {
 		// Compute the additional transaction fees as specified by the request body and the node-level fees.
 		additionalOutputs, err = fes.getTransactionFee(lib.TxnTypeBasicTransfer, senderPublicKeyBytes, requestData.TransactionFees)
 		if err != nil {
@@ -2107,6 +2171,9 @@ func (fes *APIServer) SendDiamonds(ww http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Add node source to txn metadata
+	fes.AddNodeSourceToTxnMetadata(txn)
+
 	txnBytes, err := txn.ToBytes(true)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendDiamonds: Problem serializing transaction: %v", err))
@@ -2143,6 +2210,341 @@ func (fes *APIServer) SendDiamonds(ww http.ResponseWriter, req *http.Request) {
 	}
 	if err := json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendDiamonds: Problem encoding response as JSON: %v", err))
+		return
+	}
+}
+
+type DAOCoinOperationTypeString string
+
+const (
+	DAOCoinOperationStringMint                            DAOCoinOperationTypeString = "mint"
+	DAOCoinOperationStringBurn                            DAOCoinOperationTypeString = "burn"
+	DAOCoinOperationStringUpdateTransferRestrictionStatus DAOCoinOperationTypeString = "update_transfer_restriction_status"
+	DAOCoinOperationStringDisableMinting                  DAOCoinOperationTypeString = "disable_minting"
+)
+
+type TransferRestrictionStatusString string
+
+const (
+	TransferRestrictionStatusStringUnrestricted            TransferRestrictionStatusString = "unrestricted"
+	TransferRestrictionStatusStringProfileOwnerOnly        TransferRestrictionStatusString = "profile_owner_only"
+	TransferRestrictionStatusStringDAOMembersOnly          TransferRestrictionStatusString = "dao_members_only"
+	TransferRestrictionStatusStringPermanentlyUnrestricted TransferRestrictionStatusString = "permanently_unrestricted"
+)
+
+// DAOCoinRequest ...
+type DAOCoinRequest struct {
+	// The public key of the user who is performing the DAOCoin Txn
+	UpdaterPublicKeyBase58Check string `safeForLogging:"true"`
+
+	// The public key or username of the profile whose DAO coin the transactor is trying to transact with.
+	ProfilePublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
+
+	// Whether this is a "mint", "burn" or "disable_minting" transaction
+	OperationType DAOCoinOperationTypeString `safeForLogging:"true"`
+
+	// Coins
+	CoinsToMintNanos uint256.Int `safeForLogging:"true"`
+
+	CoinsToBurnNanos uint256.Int `safeForLogging:"true"`
+
+	// Transfer Restriction Status
+	TransferRestrictionStatus TransferRestrictionStatusString `safeForLogging:"true"`
+
+	MinFeeRateNanosPerKB uint64 `safeForLogging:"true"`
+
+	// No need to specify ProfileEntryResponse in each TransactionFee
+	TransactionFees []TransactionFee `safeForLogging:"true"`
+}
+
+// DAOCoinResponse ...
+type DAOCoinResponse struct {
+	TotalInputNanos   uint64
+	ChangeAmountNanos uint64
+	FeeNanos          uint64
+	Transaction       *lib.MsgDeSoTxn
+	TransactionHex    string
+	TxnHashHex        string
+}
+
+// DAOCoin ...
+func (fes *APIServer) DAOCoin(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := DAOCoinRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem parsing request body: %v", err))
+		return
+	}
+
+	// Convert OperationTypeString to DAOCoinOperationType
+	var operationType lib.DAOCoinOperationType
+	switch requestData.OperationType {
+	case DAOCoinOperationStringMint:
+		operationType = lib.DAOCoinOperationTypeMint
+	case DAOCoinOperationStringBurn:
+		operationType = lib.DAOCoinOperationTypeBurn
+	case DAOCoinOperationStringUpdateTransferRestrictionStatus:
+		operationType = lib.DAOCoinOperationTypeUpdateTransferRestrictionStatus
+	case DAOCoinOperationStringDisableMinting:
+		operationType = lib.DAOCoinOperationTypeDisableMinting
+	default:
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: OperationType \"%v\" not supported",
+			requestData.OperationType))
+		return
+	}
+
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem computing view: %v", err))
+		return
+	}
+	// Decode the updater public key
+	updaterPublicKeyBytes, err := GetPubKeyBytesFromBase58Check(requestData.UpdaterPublicKeyBase58Check)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem decoding updater public key/username %s: %v",
+			requestData.UpdaterPublicKeyBase58Check, err))
+		return
+	}
+
+	// Compute the additional transaction fees as specified by the request body and the node-level fees.
+	additionalOutputs, err := fes.getTransactionFee(lib.TxnTypeDAOCoin, updaterPublicKeyBytes, requestData.TransactionFees)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: TransactionFees specified in Request body are invalid: %v", err))
+		return
+	}
+
+	// Get the creator public key and make sure the profile exists
+	creatorPublicKeyBytes, profileEntry, err := fes.GetPubKeAndProfileEntryForUsernameOrPublicKeyBase58Check(
+		requestData.ProfilePublicKeyBase58CheckOrUsername, utxoView)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: error getting profile or decoding public key for "+
+			"ProfilePublicKeyBase58CheckOrUsername %s: %v", requestData.ProfilePublicKeyBase58CheckOrUsername, err))
+		return
+	}
+
+	if profileEntry == nil || profileEntry.IsDeleted() {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: no profile found for profile public key %v",
+			requestData.ProfilePublicKeyBase58CheckOrUsername))
+		return
+	}
+
+	// Perform some basic sanity checks
+	if (operationType == lib.DAOCoinOperationTypeMint || operationType == lib.DAOCoinOperationTypeDisableMinting ||
+		operationType == lib.DAOCoinOperationTypeUpdateTransferRestrictionStatus) &&
+		!reflect.DeepEqual(updaterPublicKeyBytes, creatorPublicKeyBytes) {
+		_AddBadRequestError(ww, fmt.Sprintf(
+			"DAOCoin: Must be profile owner in order to perform %v operation", requestData.OperationType))
+		return
+	}
+	zero := uint256.NewInt()
+	if operationType == lib.DAOCoinOperationTypeMint && requestData.CoinsToMintNanos.Eq(zero) {
+		_AddBadRequestError(ww, fmt.Sprint("DAOCoin: Cannot mint 0 coins"))
+		return
+	}
+
+	if operationType == lib.DAOCoinOperationTypeBurn && requestData.CoinsToBurnNanos.Eq(zero) {
+		_AddBadRequestError(ww, fmt.Sprint("DAOCoin: Cannot burn 0 coins"))
+		return
+	}
+
+	var transferRestrictionStatus lib.TransferRestrictionStatus
+	if operationType == lib.DAOCoinOperationTypeUpdateTransferRestrictionStatus {
+		if profileEntry.DAOCoinEntry.TransferRestrictionStatus == lib.TransferRestrictionStatusPermanentlyUnrestricted {
+			_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Cannot update TransferRestrictionStatus if current "+
+				"status is Permanently Unrestricted"))
+			return
+		}
+		switch requestData.TransferRestrictionStatus {
+		case TransferRestrictionStatusStringUnrestricted:
+			transferRestrictionStatus = lib.TransferRestrictionStatusUnrestricted
+		case TransferRestrictionStatusStringProfileOwnerOnly:
+			transferRestrictionStatus = lib.TransferRestrictionStatusProfileOwnerOnly
+		case TransferRestrictionStatusStringDAOMembersOnly:
+			transferRestrictionStatus = lib.TransferRestrictionStatusDAOMembersOnly
+		case TransferRestrictionStatusStringPermanentlyUnrestricted:
+			transferRestrictionStatus = lib.TransferRestrictionStatusPermanentlyUnrestricted
+		default:
+			_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: TransferRestrictionStatus \"%v\" not supported",
+				requestData.TransferRestrictionStatus))
+			return
+		}
+		if profileEntry.DAOCoinEntry.TransferRestrictionStatus == transferRestrictionStatus {
+			_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Cannot update transfer restriction status to be the "+
+				"same as the current status"))
+			return
+		}
+	}
+
+	// Try and create the DAOCoin transaction for the user.
+	txn, totalInput, changeAmount, fees, err := fes.blockchain.CreateDAOCoinTxn(
+		updaterPublicKeyBytes,
+		&lib.DAOCoinMetadata{
+			OperationType:             operationType,
+			ProfilePublicKey:          creatorPublicKeyBytes,
+			CoinsToMintNanos:          requestData.CoinsToMintNanos,
+			CoinsToBurnNanos:          requestData.CoinsToBurnNanos,
+			TransferRestrictionStatus: transferRestrictionStatus,
+		},
+		// Standard transaction fields
+		requestData.MinFeeRateNanosPerKB, fes.backendServer.GetMempool(), additionalOutputs)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem adding inputs and change transaction: %v", err))
+		return
+	}
+
+	txnBytes, err := txn.ToBytes(true)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem serializing transaction: %v", err))
+		return
+	}
+
+	// Return all the data associated with the transaction in the response
+	res := DAOCoinResponse{
+		TotalInputNanos:   totalInput,
+		ChangeAmountNanos: changeAmount,
+		FeeNanos:          fees,
+		Transaction:       txn,
+		TransactionHex:    hex.EncodeToString(txnBytes),
+		TxnHashHex:        txn.Hash().String(),
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("DAOCoin: Problem encoding response as JSON: %v", err))
+		return
+	}
+}
+
+// TransferDAOCoinRequest ...
+type TransferDAOCoinRequest struct {
+	// The public key of the user who is making the transfer.
+	SenderPublicKeyBase58Check string `safeForLogging:"true"`
+
+	// The public key/Username of the profile for the DAO coin that the user is transferring.
+	ProfilePublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
+
+	// The public key/username of the user receiving the transferred creator coin.
+	ReceiverPublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
+
+	// The amount of creator coins to transfer in nanos.
+	DAOCoinToTransferNanos uint256.Int `safeForLogging:"true"`
+
+	MinFeeRateNanosPerKB uint64 `safeForLogging:"true"`
+
+	// No need to specify ProfileEntryResponse in each TransactionFee
+	TransactionFees []TransactionFee `safeForLogging:"true"`
+}
+
+// TransferDAOCoinResponse ...
+type TransferDAOCoinResponse struct {
+	SpendAmountNanos  uint64
+	TotalInputNanos   uint64
+	ChangeAmountNanos uint64
+	FeeNanos          uint64
+	Transaction       *lib.MsgDeSoTxn
+	TransactionHex    string
+	TxnHashHex        string
+}
+
+// TransferDAOCoin ...
+func (fes *APIServer) TransferDAOCoin(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := TransferDAOCoinRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem parsing request body: %v", err))
+		return
+	}
+
+	if requestData.SenderPublicKeyBase58Check == "" ||
+		requestData.ProfilePublicKeyBase58CheckOrUsername == "" ||
+		requestData.ReceiverPublicKeyBase58CheckOrUsername == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Must provide a sender, a creator, and a receiver."))
+		return
+	}
+
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem fetching utxoView: %v", err))
+		return
+	}
+
+	// Decode the updater public key
+	senderPublicKeyBytes, _, err := fes.GetPubKeAndProfileEntryForUsernameOrPublicKeyBase58Check(
+		requestData.SenderPublicKeyBase58Check, utxoView)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem decoding sender public key %s: %v",
+			requestData.SenderPublicKeyBase58Check, err))
+		return
+	}
+
+	// Compute the additional transaction fees as specified by the request body and the node-level fees.
+	additionalOutputs, err := fes.getTransactionFee(lib.TxnTypeDAOCoinTransfer, senderPublicKeyBytes, requestData.TransactionFees)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: TransactionFees specified in Request body are invalid: %v", err))
+		return
+	}
+
+	// Decode the creator public key
+	creatorPublicKeyBytes, creatorProfileEntry, err := fes.GetPubKeAndProfileEntryForUsernameOrPublicKeyBase58Check(
+		requestData.ProfilePublicKeyBase58CheckOrUsername, utxoView)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem decoding creator public key %s: %v",
+			requestData.ProfilePublicKeyBase58CheckOrUsername, err))
+		return
+	}
+
+	if creatorProfileEntry == nil || creatorProfileEntry.IsDeleted() {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: No profile entry found for creator public key %s",
+			requestData.ProfilePublicKeyBase58CheckOrUsername))
+		return
+	}
+
+	// Get the public key for the receiver.
+	receiverPublicKeyBytes, _, err := fes.GetPubKeAndProfileEntryForUsernameOrPublicKeyBase58Check(
+		requestData.ReceiverPublicKeyBase58CheckOrUsername, utxoView)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem decoding reeceiver public key %s: %v",
+			requestData.ReceiverPublicKeyBase58CheckOrUsername, err))
+		return
+	}
+
+	if err = utxoView.IsValidDAOCoinTransfer(
+		creatorProfileEntry, senderPublicKeyBytes, receiverPublicKeyBytes); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Invalid DAOCoinTransfer: %v", err))
+		return
+	}
+
+	// Try and create the TransferCreatorCoin transaction for the user.
+	txn, totalInput, changeAmount, fees, err := fes.blockchain.CreateDAOCoinTransferTxn(
+		senderPublicKeyBytes,
+		&lib.DAOCoinTransferMetadata{
+			ProfilePublicKey:       creatorPublicKeyBytes,
+			ReceiverPublicKey:      receiverPublicKeyBytes,
+			DAOCoinToTransferNanos: requestData.DAOCoinToTransferNanos,
+		},
+		// Standard transaction fields
+		requestData.MinFeeRateNanosPerKB, fes.backendServer.GetMempool(), additionalOutputs)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem creating transaction: %v", err))
+		return
+	}
+
+	txnBytes, err := txn.ToBytes(true)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem serializing transaction: %v", err))
+		return
+	}
+
+	// Return all the data associated with the transaction in the response
+	res := TransferDAOCoinResponse{
+		SpendAmountNanos:  totalInput - changeAmount - fees,
+		TotalInputNanos:   totalInput,
+		ChangeAmountNanos: changeAmount,
+		FeeNanos:          fees,
+		Transaction:       txn,
+		TransactionHex:    hex.EncodeToString(txnBytes),
+		TxnHashHex:        txn.Hash().String(),
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("TransferDAOCoin: Problem encoding response as JSON: %v", err))
 		return
 	}
 }
