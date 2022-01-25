@@ -103,6 +103,7 @@ func CustomConnect() (*pgxpool.Pool, error) {
 	if pool != nil {
 		return pool, nil
 	}
+
 	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
 	config, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
@@ -134,12 +135,18 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	// Release connection once function returns
 	defer conn.Release();
 
-	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
+	// Minus one week in Nanos
+	timeUnix := uint64(time.Now().UnixNano()) - 604800000000000
 
 	rows, err := conn.Query(context.Background(),
 	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
@@ -154,8 +161,6 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
 		return
 	} else {
-		// carefully deferring Queries closing
-        defer rows.Close()
 
 		var posts []*PostResponse
 
@@ -262,22 +267,26 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	// Release connection once function returns
 	defer conn.Release();
 
-	timeUnix := uint64(time.Now().UnixNano()) - 172800000000000
 
 	rows, err := conn.Query(context.Background(),
-	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 	poster_public_key, 
 	body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
-	WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
+	WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true 
 	AND num_nft_copies != num_nft_copies_burned
-	ORDER BY timestamp desc LIMIT 8`, timeUnix))
+	ORDER BY timestamp desc LIMIT 8`)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error query failed: %v", err))
 		return
@@ -433,7 +442,12 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 	// get connection to pool
-	conn := dbPool.Acquire(context.Background())
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
 	// Release connection once function returns
 	defer conn.Release();
@@ -664,33 +678,6 @@ func (fes *APIServer) GetNFTShowcasePlus(ww http.ResponseWriter, req *http.Reque
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("GetNFTShowcase: Problem serializing object to JSON: %v", err))
 		return
-	}
-}
-func (fes *APIServer) _nftEntryToNFTCollectionResponse(
-	nftEntry *lib.NFTEntry,
-	posterPublicKey []byte,
-	postEntryResponse *PostEntryResponse,
-	utxoView *lib.UtxoView,
-	readerPKID *lib.PKID,
-) *NFTCollectionResponse {
-	var numCopiesForSale uint64
-	var numCopiesBuyNow uint64
-	var highBuyNowPriceNanos *uint64
-	var lowBuyNowPriceNanos *uint64
-
-	highestBidAmountNanos, lowestBidAmountNanos := utxoView.GetHighAndLowBidsForNFTCollection(
-		nftEntry.NFTPostHash)
-
-	return &NFTCollectionResponse{
-		ProfileEntryResponse:    profileEntryResponse,
-		PostEntryResponse:       postEntryResponse,
-		HighestBidAmountNanos:   highestBidAmountNanos,
-		LowestBidAmountNanos:    lowestBidAmountNanos,
-		HighestBuyNowPriceNanos: highBuyNowPriceNanos,
-		LowestBuyNowPriceNanos:  lowBuyNowPriceNanos,
-		NumCopiesForSale:        numCopiesForSale,
-		NumCopiesBuyNow:         numCopiesBuyNow,
-		AvailableSerialNumbers:  serialNumbersForSale,
 	}
 }
 func (fes *APIServer) _nftEntryToNFTCollectionResponsePlus(
