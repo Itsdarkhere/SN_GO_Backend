@@ -121,6 +121,319 @@ func CustomConnect() (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+type SortMarketplaceRequest struct {
+	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
+	AuctionStatus string `safeForLogging:"true"`
+	PriceRange string `safeForLogging:"true"`
+	MarketType string `safeForLogging:"true"`
+	Category string `safeForLogging:"true"`
+	SortType string `safeForLogging:"true"`
+	ContentFormat string `safeForLogging:"true"`
+	CreatorsType string `safeForLogging:"true"`
+}
+
+func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := SortMarketplaceRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error parsing request body: %v", err))
+		return
+	}
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Cant and should not Inner join more than once on the same table
+	// Change behaviour if two or more joins occur
+	pg_nfts_inner_joined := false;
+
+	// The basic variables are the base layer of the marketplace query
+	// Based on user filtering we add options to it
+	basic_select := `EXPLAIN ANALYZE SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data`
+
+	basic_from := ` FROM pg_posts`
+
+	basic_inner_join := ""
+
+	basic_where := ` WHERE hidden = false AND nft = true 
+	AND num_nft_copies != num_nft_copies_burned`
+
+	basic_offset := ""
+
+	basic_limit := ` LIMIT 10`
+
+	basic_order_by := " ORDER BY"
+
+	// Switch for status 
+	switch one_status {
+		case "all":
+			// Add nothing
+		case "for sale":
+			basic_where = basic_where + " AND num_nft_copies_for_sale > 0"
+		case "sold":
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+			basic_where = basic_where + " AND last_accepted_bid_amount_nanos > 0 AND num_nft_copies_for_sale = 0"
+			// Change behaviour if someone tries joining twice
+			pg_nfts_inner_joined = true;
+		// This used with an inner join to pg_nfts will not work 
+		case "has bids":
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_nft_bids ON nft_post_hash = post_hash"
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in status switch")
+			return
+	}
+	// switch for price
+	switch two_price {
+		case "all":
+			// Add nothing
+		case "0.25":
+			if (pg_nfts_inner_joined) {
+				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
+				pg_nfts_inner_joined = true;
+			}
+		case "1":
+			if (pg_nfts_inner_joined) {
+				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+				pg_nfts_inner_joined = true;
+			}
+		case "10":
+			if (pg_nfts_inner_joined) {
+				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+				pg_nfts_inner_joined = true;
+			}
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in price switch")
+			return
+	}
+	// Switch for market 
+	switch three_market {
+		case "all":
+			// Do nothing
+		case "primary": 
+			if (pg_nfts_inner_joined) {
+				basic_where = basic_where + " AND owner_pkid != poster_public_key"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_where = basic_where + " AND owner_pkid != poster_public_key"
+				pg_nfts_inner_joined = true;
+			}
+		// High expense calculation 4.4s 
+		case "secondary": 
+			if (pg_nfts_inner_joined) {
+				basic_where = basic_where + " AND owner_pkid = poster_public_key"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_where = basic_where + " AND owner_pkid = poster_public_key"
+				pg_nfts_inner_joined = true;
+			}
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in market switch")
+			return
+	}
+	// switch for category
+	switch four_category {
+		case "all":
+			// Do nothing
+		case "photography":
+			basic_where = basic_where + " AND extra_data->>'category' != 'UGhvdG9ncmFwaHk='"
+		case "profile picture":
+			basic_where = basic_where + " AND extra_data->>'category' != 'UGhvdG9ncmFwaHk='"
+		case "music":
+			basic_where = basic_where + " AND extra_data->>'category' = 'TXVzaWM='"
+		case "metaverse":
+			basic_where = basic_where + " AND extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n'"
+		case "art":
+			basic_where = basic_where + " AND extra_data->>'category' = 'QXJ0'"
+		case "collectibles":
+			basic_where = basic_where + " AND extra_data->>'category' = 'Q29sbGVjdGlibGVz'"
+		case "generative art":
+			basic_where = basic_where + " AND extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ='"
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in category switch")
+			return
+	}
+	// Switch for sort
+	switch five_sort {
+		case "most recent first":
+			basic_order_by = basic_order_by + " timestamp desc"
+		case "oldest first":
+			basic_order_by = basic_order_by + " timestamp asc"
+		case "highest price first":
+			// Needs inner join id rather leave it out
+		case "lowest price first":
+			// Needs inner join id rather leave it out
+		case "most likes first":
+			basic_order_by = basic_order_by + " like_count desc"
+		case "most diamonds first":
+			basic_order_by = basic_order_by + " diamond_count desc"
+		case "most comments first":
+			basic_order_by = basic_order_by + " comment_count desc"
+		case "most reposts first":
+			basic_order_by = basic_order_by + " repost_count desc"
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in sort switch")
+			return
+	}
+	// Switch for format 
+	switch six_format { // format_all = ""
+		case "all":
+		// Do nothing
+		case "images":
+			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL"
+		case "video":
+			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' != ''"
+		case "music":
+			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
+		case "images video":
+			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL OR extra_data->>'arweaveVideoSrc' != ''"
+		case "images music":
+			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL OR extra_data->>'arweaveAudioSrc' != ''"
+		case "music video":
+			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''OR extra_data->>'arweaveAudioSrc' != ''"
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in format switch")
+			return
+	}
+	// Switch for 
+	switch seven_creators {
+		case "all":
+			// Do nothing
+		case "verified":
+			// + WHERE username matches {{ list }}"
+			// basic_select = basic_select + ", public_key"
+			// basic_inner_join = basic_inner_join + " INNER JOIN pg_profiles ON poster_public_key = public_key"
+			basic_where = basic_where + " AND extra_data->>'Node' = 'OQ=='"
+		default:
+			_AddBadRequestError(ww, "SortMarketplace: Error in creators switch")
+			return
+	}
+
+	// Concat the superstring 
+	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_offset + basic_limit
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error query failed: %v", err))
+		return
+	} else {
+
+		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error scanning to struct: %v", err))
+					return
+				}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			if post.PostExtraData["arweaveVideoSrc"] != "" {
+				post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+			}
+			if post.PostExtraData["arweaveAudioSrc"] != "" {
+				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("SortMarketplace: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+
+}
+
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := GetNFTShowcaseRequest{}
@@ -395,8 +708,7 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	var categoryString string
-	categoryString = requestData.Category
+	categoryString := requestData.Category
 
 	switch categoryString {
 		case "art":
