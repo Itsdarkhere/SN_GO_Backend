@@ -228,10 +228,10 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			}
 		case "10":
 			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+				basic_where = basic_where + " AND min_bid_amount_nanos > 100000000000"
 			} else {
 				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
+				basic_where = basic_where + " AND min_bid_amount_nanos > 100000000000"
 				pg_nfts_inner_joined = true;
 			}
 		default:
