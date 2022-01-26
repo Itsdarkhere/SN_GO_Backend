@@ -270,7 +270,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "photography":
 			basic_where = basic_where + " AND extra_data->>'category' != 'UGhvdG9ncmFwaHk='"
 		case "profile picture":
-			basic_where = basic_where + " AND extra_data->>'category' != 'UGhvdG9ncmFwaHk='"
+			basic_where = basic_where + " AND extra_data->>'category' != 'UHJvZmlsZSBQaWN0dXJl'"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'category' = 'TXVzaWM='"
 		case "metaverse":
