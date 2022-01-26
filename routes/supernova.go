@@ -104,15 +104,15 @@ func CustomConnect() (*pgxpool.Pool, error) {
 		return pool, nil
 	}
 
-	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	DATABASE_URL := "postgres://fork_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-fork"
 	config, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
 		return nil, err
 	}
-	// Configs
-	config.MaxConnIdleTime = 120 * time.Second
-	config.HealthCheckPeriod = 120 * time.Second
-	config.MaxConnIdleTime = 5 * time.Minute
+	// Configs, Database dude said this is not needed
+	//config.MaxConnIdleTime = 120 * time.Second
+	//config.HealthCheckPeriod = 120 * time.Second
+	//config.MaxConnIdleTime = 5 * time.Minute
 	// setting pool
 	pool, err = pgxpool.ConnectConfig(context.Background(), config)
 	if err != nil {
