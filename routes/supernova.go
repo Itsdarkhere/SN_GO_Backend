@@ -123,6 +123,7 @@ func CustomConnect() (*pgxpool.Pool, error) {
 
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
+	Offset int64 `safeForLogging:"true"`
 	AuctionStatus string `safeForLogging:"true"`
 	PriceRange string `safeForLogging:"true"`
 	MarketType string `safeForLogging:"true"`
@@ -160,9 +161,17 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	// Change behaviour if two or more joins occur
 	pg_nfts_inner_joined := false;
 
+	var offset int64
+	if requestData.Offset >= 0 {
+		offset = requestData.Offset
+	} else {
+		offset = 0
+	}
+
 	// The basic variables are the base layer of the marketplace query
 	// Based on user filtering we add options to it
-	basic_select := `EXPLAIN ANALYZE SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, timestamp, hidden, repost_count, quote_repost_count, 
+	basic_select := `SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data`
 
@@ -173,14 +182,14 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	basic_where := ` WHERE hidden = false AND nft = true 
 	AND num_nft_copies != num_nft_copies_burned`
 
-	basic_offset := ""
+	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
 
-	basic_limit := ` LIMIT 10`
+	basic_limit := ` LIMIT 30`
 
 	basic_order_by := " ORDER BY"
 
 	// Switch for status 
-	switch one_status {
+	switch requestData.AuctionStatus {
 		case "all":
 			// Add nothing
 		case "for sale":
@@ -198,7 +207,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// switch for price
-	switch two_price {
+	switch requestData.PriceRange {
 		case "all":
 			// Add nothing
 		case "0.25":
@@ -230,24 +239,24 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// Switch for market 
-	switch three_market {
+	switch requestData.MarketType {
 		case "all":
 			// Do nothing
 		case "primary": 
 			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND owner_pkid != poster_public_key"
+				basic_where = basic_where + " AND owner_pkid = poster_public_key"
 			} else {
 				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
-				basic_where = basic_where + " AND owner_pkid != poster_public_key"
+				basic_where = basic_where + " AND owner_pkid = poster_public_key"
 				pg_nfts_inner_joined = true;
 			}
 		// High expense calculation 4.4s 
 		case "secondary": 
 			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND owner_pkid = poster_public_key"
+				basic_where = basic_where + " AND owner_pkid != poster_public_key"
 			} else {
 				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
-				basic_where = basic_where + " AND owner_pkid = poster_public_key"
+				basic_where = basic_where + " AND owner_pkid != poster_public_key"
 				pg_nfts_inner_joined = true;
 			}
 		default:
@@ -255,7 +264,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// switch for category
-	switch four_category {
+	switch requestData.Category {
 		case "all":
 			// Do nothing
 		case "photography":
@@ -277,7 +286,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// Switch for sort
-	switch five_sort {
+	switch requestData.SortType {
 		case "most recent first":
 			basic_order_by = basic_order_by + " timestamp desc"
 		case "oldest first":
@@ -299,7 +308,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// Switch for format 
-	switch six_format { // format_all = ""
+	switch requestData.ContentFormat { // format_all = ""
 		case "all":
 		// Do nothing
 		case "images":
@@ -319,7 +328,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			return
 	}
 	// Switch for 
-	switch seven_creators {
+	switch requestData.CreatorsType {
 		case "all":
 			// Do nothing
 		case "verified":
