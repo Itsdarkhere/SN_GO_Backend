@@ -354,7 +354,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	}
 
 	// Concat the superstring 
-	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_offset + basic_limit
+	queryString := basic_select + basic_from + basic_inner_join + basic_order_by + basic_where + basic_offset + basic_limit
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
