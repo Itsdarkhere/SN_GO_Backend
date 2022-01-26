@@ -195,13 +195,13 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "for sale":
 			basic_where = basic_where + " AND num_nft_copies_for_sale > 0"
 		case "sold":
-			basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 			basic_where = basic_where + " AND last_accepted_bid_amount_nanos > 0 AND num_nft_copies_for_sale = 0"
 			// Change behaviour if someone tries joining twice
 			pg_nfts_inner_joined = true;
 		// This used with an inner join to pg_nfts will not work 
 		case "has bids":
-			basic_inner_join = basic_inner_join + " INNER JOIN pg_nft_bids ON nft_post_hash = post_hash"
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash"
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in status switch")
 			return
@@ -214,7 +214,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if (pg_nfts_inner_joined) {
 				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
 				pg_nfts_inner_joined = true;
 			}
@@ -222,7 +222,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if (pg_nfts_inner_joined) {
 				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
 				pg_nfts_inner_joined = true;
 			}
@@ -230,7 +230,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if (pg_nfts_inner_joined) {
 				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
 				pg_nfts_inner_joined = true;
 			}
@@ -246,7 +246,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if (pg_nfts_inner_joined) {
 				basic_where = basic_where + " AND owner_pkid = poster_public_key"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 				basic_where = basic_where + " AND owner_pkid = poster_public_key"
 				pg_nfts_inner_joined = true;
 			}
@@ -255,7 +255,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if (pg_nfts_inner_joined) {
 				basic_where = basic_where + " AND owner_pkid != poster_public_key"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON nft_post_hash = post_hash"
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 				basic_where = basic_where + " AND owner_pkid != poster_public_key"
 				pg_nfts_inner_joined = true;
 			}
