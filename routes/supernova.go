@@ -292,9 +292,21 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "oldest first":
 			basic_order_by = basic_order_by + " timestamp asc"
 		case "highest price first":
-			// Needs inner join id rather leave it out
+			if (pg_nfts_inner_joined) {
+				basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
+				basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+				pg_nfts_inner_joined = true;
+			}
 		case "lowest price first":
-			// Needs inner join id rather leave it out
+			if (pg_nfts_inner_joined) {
+				basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+			} else {
+				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
+				basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+				pg_nfts_inner_joined = true;
+			}
 		case "most likes first":
 			basic_order_by = basic_order_by + " like_count desc"
 		case "most diamonds first":
