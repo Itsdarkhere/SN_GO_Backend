@@ -162,6 +162,10 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	// Change behaviour if two or more joins occur
 	pg_nfts_inner_joined := false;
 
+	has_bids_selected := false;
+
+	sold_selected := true;
+
 	var offset int64
 	if requestData.Offset >= 0 {
 		offset = requestData.Offset
@@ -200,9 +204,11 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_where = basic_where + " AND last_accepted_bid_amount_nanos > 0 AND num_nft_copies_for_sale = 0"
 			// Change behaviour if someone tries joining twice
 			pg_nfts_inner_joined = true;
+			sold_selected = true;
 		// This used with an inner join to pg_nfts will not work 
 		case "has bids":
 			basic_inner_join = basic_inner_join + " INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash"
+			has_bids_selected = true;
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in status switch")
 			return
@@ -211,8 +217,11 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	highPrice := requestData.HighPrice
 	// Check if prices are positive and if lowPrice is smaller than HighPrice
 	if lowPrice < highPrice && lowPrice >= 0 {
+		// This is true only if sold
 		if (pg_nfts_inner_joined) {
-			basic_where = basic_where + fmt.Sprintf(" AND min_bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND min_bid_amount_nanos <= %v", highPrice)
+			basic_where = basic_where + fmt.Sprintf(" AND last_accepted_bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND last_accepted_bid_amount_nanos <= %v", highPrice)
+		} else if (has_bids_selected) {
+			basic_where = basic_where + fmt.Sprintf(" AND bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND bid_amount_nanos <= %v", highPrice)
 		} else {
 			basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 			basic_where = basic_where + fmt.Sprintf(" AND min_bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND min_bid_amount_nanos <= %v", highPrice)
@@ -280,20 +289,32 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "oldest first":
 			basic_order_by = basic_order_by + " timestamp asc"
 		case "highest price first":
-			if (pg_nfts_inner_joined) {
-				basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+			if (sold_selected) {
+				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos desc"
+			} else if (has_bids_selected) {
+				basic_order_by = basic_order_by + " bid_amount_nanos desc"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
-				pg_nfts_inner_joined = true;
+				if (pg_nfts_inner_joined) {
+					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+				} else {
+					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
+					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+					pg_nfts_inner_joined = true;
+				}
 			}
 		case "lowest price first":
-			if (pg_nfts_inner_joined) {
-				basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+			if (sold_selected) {
+				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos asc"
+			} else if (has_bids_selected) {
+				basic_order_by = basic_order_by + " bid_amount_nanos asc"
 			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
-				pg_nfts_inner_joined = true;
+				if (pg_nfts_inner_joined) {
+					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+				} else {
+					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
+					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+					pg_nfts_inner_joined = true;
+				}
 			}
 		case "most likes first":
 			basic_order_by = basic_order_by + " like_count desc"
