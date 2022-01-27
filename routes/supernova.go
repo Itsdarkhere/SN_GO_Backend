@@ -124,8 +124,8 @@ func CustomConnect() (*pgxpool.Pool, error) {
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	Offset int64 `safeForLogging:"true"`
-	LowPrice int64 `safeForLogging:"true"`
-	HighPrice int64 `safeForLogging:"true"`
+	LowPrice uint64 `safeForLogging:"true"`
+	HighPrice uint64 `safeForLogging:"true"`
 	AuctionStatus string `safeForLogging:"true"`
 	MarketType string `safeForLogging:"true"`
 	Category string `safeForLogging:"true"`
@@ -219,7 +219,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			pg_nfts_inner_joined = true;
 		}
 	// If values equal each other do nothing, just to keep it simple for myself in the frontend.
-	} else if lowPrice = highPrice {
+	} else if lowPrice == highPrice {
 		// Do nothing
 	} else {
 		_AddBadRequestError(ww, "SortMarketplace: Error in setting price range")
