@@ -164,7 +164,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 
 	has_bids_selected := false;
 
-	sold_selected := true;
+	sold_selected := false;
 
 	var offset int64
 	if requestData.Offset >= 0 {
@@ -204,6 +204,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_where = basic_where + " AND last_accepted_bid_amount_nanos > 0 AND num_nft_copies_for_sale = 0"
 			// Change behaviour if someone tries joining twice
 			pg_nfts_inner_joined = true;
+			// Change it some more based on this
 			sold_selected = true;
 		// This used with an inner join to pg_nfts will not work 
 		case "has bids":
