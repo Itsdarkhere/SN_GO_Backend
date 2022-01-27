@@ -209,6 +209,8 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		// This used with an inner join to pg_nfts will not work 
 		case "has bids":
 			basic_inner_join = basic_inner_join + " INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash"
+			// Remove sold from the equasion
+			basic_where = basic_where + " AND num_nft_copies_for_sale > 0"
 			has_bids_selected = true;
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in status switch")
