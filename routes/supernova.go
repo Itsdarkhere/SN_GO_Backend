@@ -124,8 +124,9 @@ func CustomConnect() (*pgxpool.Pool, error) {
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	Offset int64 `safeForLogging:"true"`
+	LowPrice int64 `safeForLogging:"true"`
+	HighPrice int64 `safeForLogging:"true"`
 	AuctionStatus string `safeForLogging:"true"`
-	PriceRange string `safeForLogging:"true"`
 	MarketType string `safeForLogging:"true"`
 	Category string `safeForLogging:"true"`
 	SortType string `safeForLogging:"true"`
@@ -206,38 +207,25 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			_AddBadRequestError(ww, "SortMarketplace: Error in status switch")
 			return
 	}
-	// switch for price
-	switch requestData.PriceRange {
-		case "all":
-			// Add nothing
-		case "0.25":
-			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
-			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_where = basic_where + " AND min_bid_amount_nanos > 2500000000"
-				pg_nfts_inner_joined = true;
-			}
-		case "1":
-			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
-			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_where = basic_where + " AND min_bid_amount_nanos > 10000000000"
-				pg_nfts_inner_joined = true;
-			}
-		case "10":
-			if (pg_nfts_inner_joined) {
-				basic_where = basic_where + " AND min_bid_amount_nanos > 100000000000"
-			} else {
-				basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-				basic_where = basic_where + " AND min_bid_amount_nanos > 100000000000"
-				pg_nfts_inner_joined = true;
-			}
-		default:
-			_AddBadRequestError(ww, "SortMarketplace: Error in price switch")
-			return
+	lowPrice := requestData.LowPrice
+	highPrice := requestData.HighPrice
+	// Check if prices are positive and if lowPrice is smaller than HighPrice
+	if lowPrice < highPrice && lowPrice >= 0 {
+		if (pg_nfts_inner_joined) {
+			basic_where = basic_where + fmt.Sprintf(" AND min_bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND min_bid_amount_nanos <= %v", highPrice)
+		} else {
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
+			basic_where = basic_where + fmt.Sprintf(" AND min_bid_amount_nanos >= %v", lowPrice) + fmt.Sprintf(" AND min_bid_amount_nanos <= %v", highPrice)
+			pg_nfts_inner_joined = true;
+		}
+	// If values equal each other do nothing, just to keep it simple for myself in the frontend.
+	} else if lowPrice = highPrice {
+		// Do nothing
+	} else {
+		_AddBadRequestError(ww, "SortMarketplace: Error in setting price range")
+		return
 	}
+	
 	// Switch for market 
 	switch requestData.MarketType {
 		case "all":
