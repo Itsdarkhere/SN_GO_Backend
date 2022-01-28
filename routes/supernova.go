@@ -466,6 +466,121 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	}
 
 }
+type SortCreatorsResponses struct {
+	SortCreatorsResponses []*SortCreatorsProfileResponse
+}
+type SortCreatorsRequest struct {
+	Offset int64 `safeForLogging:"true"`
+	Verified string `safeForLogging:"true"`
+}
+type Body struct {
+	Body ExtraData `db:"body"`
+}
+type ExtraData map[string]interface{}
+
+type SortCreatorsProfileResponse struct {
+	Username string `db:"username"`
+	ImageURLs string `json:"ImageURLs"`
+}
+func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := SortCreatorsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error parsing request body: %v", err))
+		return
+	}
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Cant and should not Inner join more than once on the same table
+	// Change behaviour if two or more joins occur
+	pg_nfts_inner_joined := false;
+
+	has_bids_selected := false;
+
+	sold_selected := false;
+
+	var offset int64
+	if requestData.Offset >= 0 {
+		offset = requestData.Offset
+	} else {
+		offset = 0
+	}
+
+	// The basic variables are the base layer of the marketplace query
+	// Based on user filtering we add options to it
+	basic_select := `SELECT username, CAST(body as JSON)`
+
+	basic_from := ` FROM pg_profiles`
+
+	basic_inner_join := " INNER JOIN pg_posts ON poster_public_key = public_key"
+
+	basic_where := ` WHERE hidden = false AND nft = true AND body::json->>'ImageURLs' <> '[]' IS TRUE
+	AND num_nft_copies != num_nft_copies_burned`
+
+	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
+
+	basic_limit := ` LIMIT 30`
+
+	//basic_order_by := " ORDER BY"
+
+	// Concat the superstring 
+	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_offset + basic_limit
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error query failed: %v", err))
+		return
+	} else {
+
+		var profiles []*SortCreatorsProfileResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			profile := new(SortCreatorsProfileResponse)
+			body := new(Body)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&profile.Username, &body.Body)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error scanning to struct: %v", err))
+					return
+				}
+			profile.ImageURLs = body.Body["ImageURLs"]
+			profiles = append(profiles, profile)
+        }
+
+		resp := SortCreatorsResponses {
+			SortCreatorsResponses: profiles,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("SortCreators: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+
+}
 
 func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
