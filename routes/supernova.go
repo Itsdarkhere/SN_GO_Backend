@@ -390,7 +390,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			// Need a holder var for the bytea format
 			poster_public_key_bytea := new(PPKBytea)
             // Scan reads the values from the current row into tmp
-            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+            rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
 				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
