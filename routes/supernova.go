@@ -175,7 +175,8 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 
 	// The basic variables are the base layer of the marketplace query
 	// Based on user filtering we add options to it
-	basic_select := `SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	basic_select := `SELECT DISTINCT ON (post_hash) encode(post_hash, 'hex') as post_hash, like_count, diamond_count, 
+	comment_count, 
 	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data`
@@ -288,45 +289,45 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	// Switch for sort
 	switch requestData.SortType {
 		case "most recent first":
-			basic_order_by = basic_order_by + " timestamp desc"
+			basic_order_by = basic_order_by + " post_hash, timestamp desc"
 		case "oldest first":
-			basic_order_by = basic_order_by + " timestamp asc"
+			basic_order_by = basic_order_by + " post_hash, timestamp asc"
 		case "highest price first":
 			if (sold_selected) {
-				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos desc"
+				basic_order_by = basic_order_by + " post_hash, last_accepted_bid_amount_nanos desc"
 			} else if (has_bids_selected) {
-				basic_order_by = basic_order_by + " bid_amount_nanos desc"
+				basic_order_by = basic_order_by + " post_hash, bid_amount_nanos desc"
 			} else {
 				if (pg_nfts_inner_joined) {
-					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+					basic_order_by = basic_order_by + " post_hash, min_bid_amount_nanos desc"
 				} else {
 					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
+					basic_order_by = basic_order_by + " post_hash, min_bid_amount_nanos desc"
 					pg_nfts_inner_joined = true;
 				}
 			}
 		case "lowest price first":
 			if (sold_selected) {
-				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos asc"
+				basic_order_by = basic_order_by + " post_hash, last_accepted_bid_amount_nanos asc"
 			} else if (has_bids_selected) {
 				basic_order_by = basic_order_by + " bid_amount_nanos asc"
 			} else {
 				if (pg_nfts_inner_joined) {
-					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+					basic_order_by = basic_order_by + " post_hash, min_bid_amount_nanos asc"
 				} else {
 					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
-					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
+					basic_order_by = basic_order_by + " post_hash, min_bid_amount_nanos asc"
 					pg_nfts_inner_joined = true;
 				}
 			}
 		case "most likes first":
-			basic_order_by = basic_order_by + " like_count desc"
+			basic_order_by = basic_order_by + " post_hash, like_count desc"
 		case "most diamonds first":
-			basic_order_by = basic_order_by + " diamond_count desc"
+			basic_order_by = basic_order_by + " post_hash, diamond_count desc"
 		case "most comments first":
-			basic_order_by = basic_order_by + " comment_count desc"
+			basic_order_by = basic_order_by + " post_hash, comment_count desc"
 		case "most reposts first":
-			basic_order_by = basic_order_by + " repost_count desc"
+			basic_order_by = basic_order_by + " post_hash, repost_count desc"
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in sort switch")
 			return
