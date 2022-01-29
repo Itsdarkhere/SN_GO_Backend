@@ -473,14 +473,14 @@ type SortCreatorsRequest struct {
 	Offset int64 `safeForLogging:"true"`
 	Verified string `safeForLogging:"true"`
 }
-type Body struct {
-	Body ExtraData `db:"body"`
+type BodyJson struct {
+	Body BodyData `db:"body"`
 }
-type ExtraData map[string]interface{}
+type BodyData map[string]interface{}
 
 type SortCreatorsProfileResponse struct {
 	Username string `db:"username"`
-	ImageURLs string `json:"ImageURLs"`
+	ImageURLs []string `db:"body"`
 }
 func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -505,14 +505,6 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 
 	// Release connection once function returns
 	defer conn.Release();
-
-	// Cant and should not Inner join more than once on the same table
-	// Change behaviour if two or more joins occur
-	pg_nfts_inner_joined := false;
-
-	has_bids_selected := false;
-
-	sold_selected := false;
 
 	var offset int64
 	if requestData.Offset >= 0 {
@@ -565,7 +557,9 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 					_AddBadRequestError(ww, fmt.Sprintf("SortCreators: Error scanning to struct: %v", err))
 					return
 				}
-			profile.ImageURLs = body.Body["ImageURLs"]
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			profile.ImageURLs = content.ImageURLs
 			profiles = append(profiles, profile)
         }
 
