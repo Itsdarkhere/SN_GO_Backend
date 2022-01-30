@@ -359,10 +359,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "all":
 			// Do nothing
 		case "verified":
-			// + WHERE username matches {{ list }}"
-			// basic_select = basic_select + ", public_key"
-			// basic_inner_join = basic_inner_join + " INNER JOIN pg_profiles ON poster_public_key = public_key"
-			basic_where = basic_where + " AND extra_data->>'Node' = 'OQ=='"
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_verified ON pg_verified.public_key = pg_posts.poster_public_key"
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in creators switch")
 			return
@@ -539,7 +536,9 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 
 	basic_limit := ` LIMIT 30`
 
-	//basic_order_by := " ORDER BY"
+	if requestData.Verified == "verified" {
+		basic_inner_join = basic_inner_join + " INNER JOIN pg_verified ON pg_verified.username = pg_profiles.username"
+	}
 
 	// Concat the superstring 
 	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_offset + basic_limit
