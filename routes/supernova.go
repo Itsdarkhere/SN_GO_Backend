@@ -524,7 +524,7 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 	basic_where := ` WHERE hidden = false AND nft = true AND body::json->>'ImageURLs' <> '[]' IS TRUE
 	AND num_nft_copies != num_nft_copies_burned`
 
-	basic_group_by := " GROUP BY pg_profiles.username"
+	basic_group_by := " GROUP BY pg_profiles.username, pg_posts.body"
 
 	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
 
