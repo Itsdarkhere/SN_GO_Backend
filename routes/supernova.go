@@ -515,7 +515,7 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 
 	// The basic variables are the base layer of the marketplace query
 	// Based on user filtering we add options to it
-	basic_select := `SELECT username, CAST(body as JSON)`
+	basic_select := `SELECT pg_profiles.username, CAST(body as JSON)`
 
 	basic_from := ` FROM pg_profiles`
 
@@ -529,7 +529,7 @@ func (fes *APIServer) SortCreators(ww http.ResponseWriter, req *http.Request) {
 	basic_limit := ` LIMIT 30`
 
 	if requestData.Verified == "verified" {
-		basic_inner_join = basic_inner_join + " INNER JOIN pg_verified ON pg_verified.username = pg_profiles.username"
+		basic_inner_join = basic_inner_join + " INNER JOIN pg_verified ON pg_profiles.username = pg_verified.username"
 	}
 
 	// Concat the superstring 
