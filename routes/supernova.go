@@ -60,6 +60,12 @@ type PostResponse struct {
     NumNFTCopiesBurned int64 `db:"num_nft_copies_burned"`
 	PostExtraData ExtraData `db:"extra_data"`
 }
+// This is just to store values from the aggregate function that I dont need. 
+type Waster struct {
+	BidAmount int64 `db:"bid_amount"`
+	LastAcceptedBidAmountNanos int64 `db:"last_accepted_bid_amount_nanos"`
+	MinBidAmountNanos int64 `db:"min_bid_amount_nanos"`
+}
 type PostResponses struct {
 	PostEntryResponse []*PostResponse
 }
@@ -402,17 +408,61 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			// Need a holder var for the bytea format
 			poster_public_key_bytea := new(PPKBytea)
             // Scan reads the values from the current row into tmp
-            rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
-				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
-				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
-				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-				&post.NumNFTCopiesBurned, &post.PostExtraData)
+			if (sold_selected && (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first")) {
+				wasteValue := new(Waster)
+				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
+					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.LastAcceptedBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
 					_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error scanning to struct: %v", err))
 					return
 				}
+
+			} else if (has_bids_selected && (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first")) {
+				wasteValue := new(Waster)
+				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
+					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.BidAmount)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error scanning to struct: %v", err))
+					return
+				}
+
+			} else if (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first") {
+				wasteValue := new(Waster)
+				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
+					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.MinBidAmountNanos)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error scanning to struct: %v", err))
+					return
+				}
+
+			} else {
+				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
+					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+					&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error scanning to struct: %v", err))
+					return
+				}
+			}
 			if post.PostExtraData["name"] != "" {
 				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
 			}
