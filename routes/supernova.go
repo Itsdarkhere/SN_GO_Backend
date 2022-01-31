@@ -360,15 +360,15 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "images":
 			basic_where = basic_where + " AND body::json->>'ImageURLs' <> '[]' IS TRUE AND extra_data->>'arweaveAudioSrc' IS NULL"
 		case "video":
-			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' <> '[]')"
+			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
 		case "images video":
-			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL OR extra_data->>'arweaveVideoSrc' != ''"
+			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE) OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "images music":
-			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL OR extra_data->>'arweaveAudioSrc' != ''"
+			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE)"
 		case "music video":
-			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''OR extra_data->>'arweaveAudioSrc' != ''"
+			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != '' OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in format switch")
 			return
