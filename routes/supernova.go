@@ -310,7 +310,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 				basic_select = basic_select + ", MAX(pg_nfts.last_accepted_bid_amount_nanos) as last_accepted_bid_amount_nanos"
 				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos desc"
 			} else if (has_bids_selected) {
-				basic_select = basic_select + ", MAX(pg_nfts.bid_amount_nanos) as bid_amount_nanos"
+				basic_select = basic_select + ", MAX(pg_nft_bids.bid_amount_nanos) as bid_amount_nanos"
 				basic_order_by = basic_order_by + " bid_amount_nanos desc"
 			} else {
 				if (pg_nfts_inner_joined) {
@@ -328,7 +328,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 				basic_select = basic_select + ", MAX(pg_nfts.last_accepted_bid_amount_nanos) as last_accepted_bid_amount_nanos"
 				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos asc"
 			} else if (has_bids_selected) {
-				basic_select = basic_select + ", MAX(pg_nfts.bid_amount_nanos) as bid_amount_nanos"
+				basic_select = basic_select + ", MAX(pg_nft_bids.bid_amount_nanos) as bid_amount_nanos"
 				basic_order_by = basic_order_by + " bid_amount_nanos asc"
 			} else {
 				if (pg_nfts_inner_joined) {
