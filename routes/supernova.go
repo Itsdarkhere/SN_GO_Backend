@@ -360,7 +360,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "images":
 			basic_where = basic_where + " AND body::json->>'ImageURLs' <> '[]' IS TRUE AND extra_data->>'arweaveAudioSrc' IS NULL"
 		case "video":
-			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' != '' OR body::json->>'VideoURLs' <> '[]'"
+			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' <> '[]')"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
 		case "images video":
