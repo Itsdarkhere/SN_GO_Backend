@@ -196,6 +196,8 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 
 	basic_order_by := " ORDER BY"
 
+	// The switches below are in order, changing would cause problems
+
 	// Switch for status 
 	switch requestData.AuctionStatus {
 		case "all":
@@ -296,13 +298,20 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_order_by = basic_order_by + " timestamp asc"
 		case "highest price first":
 			if (sold_selected) {
+				// These MAX aggregate functions make sure the order by work basically
+				// Aggregate must be used or alternative must add values from these to GROUP BY
+				// But that results in duplicates
+				basic_select = basic_select + ", MAX(pg_nfts.last_accepted_bid_amount_nanos) as last_accepted_bid_amount_nanos"
 				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos desc"
 			} else if (has_bids_selected) {
+				basic_select = basic_select + ", MAX(pg_nfts.bid_amount_nanos) as bid_amount_nanos"
 				basic_order_by = basic_order_by + " bid_amount_nanos desc"
 			} else {
 				if (pg_nfts_inner_joined) {
+					basic_select = basic_select + ", MAX(pg_nfts.min_bid_amount_nanos) as min_bid_amount_nanos"
 					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
 				} else {
+					basic_select = basic_select + ", MAX(pg_nfts.min_bid_amount_nanos) as min_bid_amount_nanos"
 					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 					basic_order_by = basic_order_by + " min_bid_amount_nanos desc"
 					pg_nfts_inner_joined = true;
@@ -310,13 +319,17 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			}
 		case "lowest price first":
 			if (sold_selected) {
+				basic_select = basic_select + ", MAX(pg_nfts.last_accepted_bid_amount_nanos) as last_accepted_bid_amount_nanos"
 				basic_order_by = basic_order_by + " last_accepted_bid_amount_nanos asc"
 			} else if (has_bids_selected) {
+				basic_select = basic_select + ", MAX(pg_nfts.bid_amount_nanos) as bid_amount_nanos"
 				basic_order_by = basic_order_by + " bid_amount_nanos asc"
 			} else {
 				if (pg_nfts_inner_joined) {
+					basic_select = basic_select + ", MAX(pg_nfts.min_bid_amount_nanos) as min_bid_amount_nanos"
 					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
 				} else {
+					basic_select = basic_select + ", MAX(pg_nfts.min_bid_amount_nanos) as min_bid_amount_nanos"
 					basic_inner_join = basic_inner_join + " INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash"
 					basic_order_by = basic_order_by + " min_bid_amount_nanos asc"
 					pg_nfts_inner_joined = true;
