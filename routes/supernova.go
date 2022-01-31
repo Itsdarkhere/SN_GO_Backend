@@ -304,7 +304,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_order_by = basic_order_by + " timestamp asc"
 		case "highest price first":
 			if (sold_selected) {
-				// These MAX aggregate functions make sure the order by work basically
+				// These MAX aggregate functions make sure the order by works basically
 				// Aggregate must be used or alternative must add values from these to GROUP BY
 				// But that results in duplicates
 				basic_select = basic_select + ", MAX(pg_nfts.last_accepted_bid_amount_nanos) as last_accepted_bid_amount_nanos"
@@ -358,9 +358,9 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "all":
 		// Do nothing
 		case "images":
-			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL"
+			basic_where = basic_where + " AND body::json->>'ImageURLs' <> '[]' IS TRUE AND extra_data->>'arweaveAudioSrc' IS NULL"
 		case "video":
-			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' != ''"
+			basic_where = basic_where + " AND extra_data->>'arweaveVideoSrc' != '' OR body::json->>'VideoURLs' <> '[]'"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
 		case "images video":
