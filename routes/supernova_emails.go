@@ -2,11 +2,9 @@ package routes
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"io"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"fmt"
 	sendinblue "github.com/sendinblue/APIv3-go-library/lib"
 )
@@ -78,7 +76,7 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -91,9 +89,9 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v"), err)
+		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v", err))
 		return
 	}
 	// Return a Success response
@@ -162,7 +160,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -175,7 +173,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: Failed to send email: %v", err))
 		return
@@ -260,7 +258,7 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -273,7 +271,7 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: Failed to send email: %v", err))
 		return
@@ -344,7 +342,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -357,7 +355,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Failed to send email: %v", err))
 		return
@@ -428,7 +426,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -441,7 +439,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: Failed to send email: %v", err))
 		return
@@ -527,7 +525,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -540,7 +538,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
@@ -626,7 +624,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -639,7 +637,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 10)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 10)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
@@ -717,7 +715,7 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 		EmailBcc:      []string{},
 		EmailCc:       []string{},
 		ReplyTo:       "",
-		AttachmentUrl: url,
+		AttachmentUrl: "",
 		Attachment:    []sendinblue.SendEmailAttachment{},
 		Headers:       nil,
 		Attributes:    nil,
@@ -730,7 +728,7 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 	body.Attributes = &params
 
 	// Send the email template
-	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 13)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 13)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Failed to send email: %v", err))
 		return
