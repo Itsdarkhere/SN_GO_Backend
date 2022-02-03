@@ -249,6 +249,16 @@ const (
 	RoutePathGetCommunityFavourites = "/api/v0/get-community-favourites"
 	RoutePathGetFreshDrops = "/api/v0/get-fresh-drops"
 	RoutePathGetNFTsByCategory = "/api/v0/get-nfts-by-category"
+	// Supernovas emails
+	RoutePathSendVerifyEmailEmail = "/api/v0/send-verify-email-email"
+	RoutePathSendLostNFTEmail = "/api/v0/send-lost-nft-email"
+	RoutePathSendNewBidEmail = "/api/v0/send-new-bid-email"
+	RoutePathSendInactiveUserEmail = "/api/v0/send-inactive-user-email"
+	RoutePathSendWelcomeEmail = "/api/v0/send-welcome-email"
+	RoutePathSendBidAgainEmail = "/api/v0/send-bid-again-email"
+	RoutePathSendWonNFTEmail = "/api/v0/send-won-nft-email"
+	RoutePathSendBidPlacedEmail = "/api/v0/send-bid-placed-email"
+
 
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"

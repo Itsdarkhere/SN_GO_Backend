@@ -659,7 +659,7 @@ type BidPlaceRequest {
 	Email string `json:"email"`
 }
 // Sent when a user has the winning bid
-func (fes *APIServer) SendBidPlaceEmail(ww http.ResponseWriter, req *http.Request) {
+func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	// Check Request 
 	requestData := BidPlaceRequest{}
