@@ -14,6 +14,10 @@ import (
 // Rather than start sending wrong emails
 // Enjoy, or dont <3
 
+// Used for all routes as the success response
+type EmailSuccessResponse {
+	Success: bool `json:"success"`
+}
 
 // Verify Email Template
 type VerifyEmailEmailRequest {
@@ -90,8 +94,14 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
-
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // Lost nft bid request
 type LostNFTRequest {
@@ -168,7 +178,14 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // New bid made on nft
 type NewBidRequest {
@@ -259,7 +276,14 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // User has been inactive for a while
 type InactiveUserRequest {
@@ -336,7 +360,14 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // Welcome email 
 type WelcomeRequest {
@@ -413,7 +444,14 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // Someone outbid the user
 type BidAgainRequest {
@@ -505,7 +543,14 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // Won NFT
 type WonNFTRequest {
@@ -597,7 +642,14 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
 // NFT bid place
 type BidPlaceRequest {
@@ -681,5 +733,12 @@ func (fes *APIServer) SendBidPlaceEmail(ww http.ResponseWriter, req *http.Reques
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Failed to send email: %v", err))
 		return
 	}
-	return 
+	// Return a Success response
+	res := EmailSuccessResponse{
+		Success: true
+	}
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Problem encoding response as JSON: %v", err))
+		return
+	}
 }
