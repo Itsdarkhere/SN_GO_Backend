@@ -668,17 +668,17 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 	defer conn.Release();
 
 	// Minus one week in Nanos
-	timeUnix := uint64(time.Now().UnixNano()) - 604800000000000
+	//timeUnix := uint64(time.Now().UnixNano()) - 604800000000000
 
 	rows, err := conn.Query(context.Background(),
-	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 	poster_public_key, 
 	body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
-	WHERE extra_data->>'Node' = 'OQ==' AND timestamp > %+v AND hidden = false AND nft = true 
+	WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true 
 	AND num_nft_copies != num_nft_copies_burned
-	ORDER BY diamond_count desc, like_count desc, comment_count desc LIMIT 10`, timeUnix))
+	ORDER BY diamond_count desc, like_count desc, comment_count desc LIMIT 10`)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error query failed: %v", err))
 		return

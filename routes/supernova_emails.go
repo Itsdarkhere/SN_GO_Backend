@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"io"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"fmt"
 	sendinblue "github.com/sendinblue/APIv3-go-library/lib"
@@ -15,12 +17,12 @@ import (
 // Enjoy, or dont <3
 
 // Used for all routes as the success response
-type EmailSuccessResponse {
-	Success: bool `json:"success"`
+type EmailSuccessResponse struct {
+	Success bool `json:"success"`
 }
 
 // Verify Email Template
-type VerifyEmailEmailRequest {
+type VerifyEmailEmailRequest struct {
 	Username string `json:"username"`
 	Link string `json:"link"`
 	Email string `json:"email"`
@@ -48,18 +50,18 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have username
-	if requestData.Username == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: No username sent: %v", err))
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, "SendVerifyEmailEmail: No username sent")
 		return
 	}
 	// Make sure we have link
-	if requestData.Link == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: No link sent: %v", err))
+	if requestData.Link == "" {
+		_AddBadRequestError(ww, "SendVerifyEmailEmail: No link sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: No email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendVerifyEmailEmail: No email sent in request")
 		return
 	}
 
@@ -91,12 +93,12 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 	// Send the email template
 	result, resp, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
 	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v", err))
+		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v"), err)
 		return
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Problem encoding response as JSON: %v", err))
@@ -104,7 +106,7 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 	}
 }
 // Lost nft bid request
-type LostNFTRequest {
+type LostNFTRequest struct {
 	Username string `json:"username"`
 	ArtName string `json:"artname"`
 	Email string `json:"email"`
@@ -132,18 +134,18 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have username
-	if requestData.Username == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: No username sent: %v", err))
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, "SendLostNFTEmail: No username sent")
 		return
 	}
 	// Make sure we have art name
-	if requestData.ArtName == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: No link sent: %v", err))
+	if requestData.ArtName == "" {
+		_AddBadRequestError(ww, "SendLostNFTEmail: No link sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: No email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendLostNFTEmail: No email sent in request")
 		return
 	}
 
@@ -180,7 +182,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: Problem encoding response as JSON: %v", err))
@@ -188,7 +190,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 	}
 }
 // New bid made on nft
-type NewBidRequest {
+type NewBidRequest struct {
 	CreatorUsername string `json:"creator_username"`
 	BidderUsername string `json:"bidder_username"`
 	BidAmount uint64 `json:"bid_amount"`
@@ -218,28 +220,28 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have CreatorUsername
-	if requestData.CreatorUsername == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: No CreatorUsername sent: %v", err))
+	if requestData.CreatorUsername == "" {
+		_AddBadRequestError(ww, "SendNewBidEmail: No CreatorUsername sent")
 		return
 	}
 	// Make sure we have BidderUsername
-	if requestData.BidderUsername == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: No BidderUsername sent: %v", err))
+	if requestData.BidderUsername == "" {
+		_AddBadRequestError(ww, "SendNewBidEmail: No BidderUsername sent")
 		return
 	}
 	// Make sure we have bid amount
-	if requestData.BidAmount == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: No BidAmount sent: %v", err))
+	if requestData.BidAmount == 0 {
+		_AddBadRequestError(ww, "SendNewBidEmail: No BidAmount sent")
 		return
 	}
 	// Make sure we have a link to the nft
-	if requestData.LinkToNFT == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: No LinkToNFT sent: %v", err))
+	if requestData.LinkToNFT == "" {
+		_AddBadRequestError(ww, "SendNewBidEmail: No LinkToNFT sent:")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: No email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendNewBidEmail: No email sent in request:")
 		return
 	}
 
@@ -278,7 +280,7 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: Problem encoding response as JSON: %v", err))
@@ -286,7 +288,7 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 	}
 }
 // User has been inactive for a while
-type InactiveUserRequest {
+type InactiveUserRequest struct {
 	Username string `json:"username"`
 	LinkToProfile string `json:"link_to_profile"`
 	Email string `json:"email"`
@@ -314,18 +316,18 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have Username
-	if requestData.Username == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: No Username sent: %v", err))
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, "SendInactiveUserEmail: No Username sent")
 		return
 	}
 	// Make sure we have link to profile
-	if requestData.LinkToProfile == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: No LinkToProfile sent: %v", err))
+	if requestData.LinkToProfile == "" {
+		_AddBadRequestError(ww, "SendInactiveUserEmail: No LinkToProfile sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: No Email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendInactiveUserEmail: No Email sent in request:")
 		return
 	}
 
@@ -362,7 +364,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Problem encoding response as JSON: %v", err))
@@ -370,7 +372,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	}
 }
 // Welcome email 
-type WelcomeRequest {
+type WelcomeRequest struct {
 	Username string `json:"username"`
 	LinkToProfile string `json:"link_to_profile"`
 	Email string `json:"email"`
@@ -398,18 +400,18 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have Username
-	if requestData.Username == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: No Username sent: %v", err))
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, "SendWelcomeEmail: No Username sent")
 		return
 	}
 	// Make sure we have link to profile
-	if requestData.LinkToProfile == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: No LinkToProfile sent: %v", err))
+	if requestData.LinkToProfile == "" {
+		_AddBadRequestError(ww, "SendWelcomeEmail: No LinkToProfile sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: No Email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendWelcomeEmail: No Email sent in request")
 		return
 	}
 
@@ -446,7 +448,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: Problem encoding response as JSON: %v", err))
@@ -454,7 +456,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	}
 }
 // Someone outbid the user
-type BidAgainRequest {
+type BidAgainRequest struct {
 	OutBiddedUsername string `json:"out_bidded_username"`
 	OutBidderUsername string `json:"out_bidder_username"`
 	NewBidAmount int64 `json:"new_bid_amount"`
@@ -484,28 +486,28 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have OutBiddedUsername
-	if requestData.OutBiddedUsername == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: No OutBiddedUsername sent: %v", err))
+	if requestData.OutBiddedUsername == "" {
+		_AddBadRequestError(ww, "SendBidAgainEmail: No OutBiddedUsername sent")
 		return
 	}
 	// Make sure we have link to OutBidderUsername 
-	if requestData.OutBidderUsername  == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: No OutBidderUsername sent: %v", err))
+	if requestData.OutBidderUsername  == "" {
+		_AddBadRequestError(ww, "SendBidAgainEmail: No OutBidderUsername sent")
 		return
 	}
 	// Make sure we have link to NewBidAmount
-	if requestData.NewBidAmount  == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: No NewBidAmount sent: %v", err))
+	if requestData.NewBidAmount  == 0 {
+		_AddBadRequestError(ww, "SendBidAgainEmail: No NewBidAmount sent")
 		return
 	}
 	// Make sure we have link to LinkToNFT
-	if requestData.LinkToNFT  == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: No LinkToNFT sent: %v", err))
+	if requestData.LinkToNFT  == "" {
+		_AddBadRequestError(ww, "SendBidAgainEmail: No LinkToNFT sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: No Email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendBidAgainEmail: No Email sent in request")
 		return
 	}
 
@@ -545,7 +547,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Problem encoding response as JSON: %v", err))
@@ -553,7 +555,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 	}
 }
 // Won NFT
-type WonNFTRequest {
+type WonNFTRequest struct {
 	WinnerUsername string `json:"winner_username"`
 	ArtName string `json:"art_name"`
 	WinningBidAmount uint64 `json:"winning_bid_amount"`
@@ -583,28 +585,28 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have WinnerUsername
-	if requestData.WinnerUsername == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWonNFTEmail: No WinnerUsername sent: %v", err))
+	if requestData.WinnerUsername == "" {
+		_AddBadRequestError(ww, "SendWonNFTEmail: No WinnerUsername sent")
 		return
 	}
 	// Make sure we have link to ArtName
-	if requestData.ArtName == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWonNFTEmail: No ArtName sent: %v", err))
+	if requestData.ArtName == "" {
+		_AddBadRequestError(ww, "SendWonNFTEmail: No ArtName sent")
 		return
 	}
 	// Make sure we have link to WinningBidAmount
-	if requestData.WinningBidAmount == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWonNFTEmail: No WinningBidAmount sent: %v", err))
+	if requestData.WinningBidAmount == 0 {
+		_AddBadRequestError(ww, "SendWonNFTEmail: No WinningBidAmount sent")
 		return
 	}
 	// Make sure we have link to LinkToNFT
-	if requestData.LinkToNFT == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWonNFTEmail: No LinkToNFT sent: %v", err))
+	if requestData.LinkToNFT == "" {
+		_AddBadRequestError(ww, "SendWonNFTEmail: No LinkToNFT sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendWonNFTEmail: No Email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendWonNFTEmail: No Email sent in request")
 		return
 	}
 
@@ -644,7 +646,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Problem encoding response as JSON: %v", err))
@@ -652,7 +654,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 	}
 }
 // NFT bid place
-type BidPlaceRequest {
+type BidPlaceRequest struct {
 	Username string `json:"username"`
 	BidAmount uint64 `json:"bid_amount"`
 	LinkToNFT string `json:"link_to_nft"`
@@ -681,23 +683,23 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 	sib := sendinblue.NewAPIClient(cfg)
 
 	// Make sure we have Username
-	if requestData.Username == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: No Username sent: %v", err))
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, "SendBidPlaceEmail: No Username sent")
 		return
 	}
 	// Make sure we have link to BidAmount
-	if requestData.BidAmount == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: No BidAmount sent: %v", err))
+	if requestData.BidAmount == 0 {
+		_AddBadRequestError(ww, "SendBidPlaceEmail: No BidAmount sent")
 		return
 	}
 	// Make sure we have link to LinkToNFT
-	if requestData.LinkToNFT == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: No LinkToNFT sent: %v", err))
+	if requestData.LinkToNFT == "" {
+		_AddBadRequestError(ww, "SendBidPlaceEmail: No LinkToNFT sent")
 		return
 	}
 	// Make sure we have email
-	if requestData.Email == nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: No Email sent in request: %v", err))
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, "SendBidPlaceEmail: No Email sent in request")
 		return
 	}
 
@@ -735,7 +737,7 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 	}
 	// Return a Success response
 	res := EmailSuccessResponse{
-		Success: true
+		Success: true,
 	}
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Problem encoding response as JSON: %v", err))
