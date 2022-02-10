@@ -380,6 +380,12 @@ type APIServer struct {
 	// map of country name to sign up bonus data
 	AllCountryLevelSignUpBonuses map[string]CountrySignUpBonusResponse
 
+	// Frequently accessed data from global state
+	USDCentsToDESOReserveExchangeRate uint64
+	BuyDESOFeeBasisPoints uint64
+	JumioUSDCents uint64
+	JumioKickbackUSDCents uint64
+
 	// Signals that the frontend server is in a stopped state
 	quit chan struct{}
 }
@@ -2247,6 +2253,10 @@ func (fes *APIServer) SetGlobalStateCache() {
 	fes.SetGraylistedPKIDMap(utxoView)
 	fes.SetGlobalFeedPostHashes()
 	fes.SetAllCountrySignUpBonusMetadata()
+	fes.SetUSDCentsToDeSoReserveExchangeRateFromGlobalState()
+	fes.SetBuyDeSoFeeBasisPointsResponseFromGlobalState()
+	fes.SetJumioUSDCents()
+	fes.SetJumioKickbackUSDCents()
 }
 
 func (fes *APIServer) SetVerifiedUsernameMap() {
