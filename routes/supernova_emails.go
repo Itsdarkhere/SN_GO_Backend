@@ -355,7 +355,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	body.Attributes = &params
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 13)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Failed to send email: %v", err))
 		return
