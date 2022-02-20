@@ -59,6 +59,8 @@ type PostResponse struct {
     NumNFTCopiesForSale int64 `db:"num_nft_copies_for_sale"`
     NumNFTCopiesBurned int64 `db:"num_nft_copies_burned"`
 	PostExtraData ExtraData `db:"extra_data"`
+	// Information about the reader's state w/regard to this post (e.g. if they liked it).
+	PostEntryReaderState *lib.PostEntryReaderState
 }
 // This is just to store values from the aggregate function that I dont need. 
 type Waster struct {
@@ -159,6 +161,16 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error cant connect to database: %v", err))
 		conn.Release()
 		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			return
+		}
 	}
 
 	// Release connection once function returns
@@ -513,6 +525,8 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			post.PosterPublicKeyBase58Check = publicKeyBase58Check
 			// Assign ProfileEntryResponse
 			post.ProfileEntryResponse = profileEntryResponse
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, post)
 			// Append to array for returning
 			posts = append(posts, post)
         }
