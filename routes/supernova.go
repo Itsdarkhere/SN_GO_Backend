@@ -676,6 +676,17 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Error parsing request body: %v", err))
 		return
 	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			return
+		}
+	}
+
 	// Get connection pool
 	dbPool, err := CustomConnect()
 	if err != nil {
@@ -785,6 +796,19 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 			post.PosterPublicKeyBase58Check = publicKeyBase58Check
 			// Assign ProfileEntryResponse
 			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if repostedPostEntry == nil {
+				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 			// Append to array for returning
 			posts = append(posts, post)
         }
@@ -806,6 +830,16 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetFreshDrops: Error parsing request body: %v", err))
 		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			return
+		}
 	}
 
 	// Get connection pool
@@ -915,6 +949,19 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			post.PosterPublicKeyBase58Check = publicKeyBase58Check
 			// Assign ProfileEntryResponse
 			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if repostedPostEntry == nil {
+				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 			// Append to array for returning
 			posts = append(posts, post)
         }
@@ -941,6 +988,16 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetNFTsByCategory: Error parsing request body: %v", err))
 		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+			return
+		}
 	}
 
 	categoryString := requestData.Category
@@ -1106,6 +1163,19 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			post.PosterPublicKeyBase58Check = publicKeyBase58Check
 			// Assign ProfileEntryResponse
 			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if repostedPostEntry == nil {
+				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 			// Append to array for returning
 			posts = append(posts, post)
         }
