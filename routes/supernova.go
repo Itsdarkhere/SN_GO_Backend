@@ -804,8 +804,9 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 			}
 			// Fetch the postEntry requested.
 			postEntry := utxoView.GetPostEntryForPostHash(postHash)
-			if repostedPostEntry == nil {
-				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavoutites: Could not fetch postEntry"))
+				return
 			}
 			// Get info regarding the readers interactions with the post
 			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
@@ -957,8 +958,9 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			}
 			// Fetch the postEntry requested.
 			postEntry := utxoView.GetPostEntryForPostHash(postHash)
-			if repostedPostEntry == nil {
-				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetFreshdrops: Could not fetch postEntry"))
+				return
 			}
 			// Get info regarding the readers interactions with the post
 			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
@@ -1171,8 +1173,9 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			}
 			// Fetch the postEntry requested.
 			postEntry := utxoView.GetPostEntryForPostHash(postHash)
-			if repostedPostEntry == nil {
-				return nil, fmt.Errorf("GetCommunityFavourites: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: Could not fetch postEntry"))
+				return
 			}
 			// Get info regarding the readers interactions with the post
 			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
