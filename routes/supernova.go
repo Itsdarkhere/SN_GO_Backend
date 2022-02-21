@@ -525,13 +525,19 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			post.PosterPublicKeyBase58Check = publicKeyBase58Check
 			// Assign ProfileEntryResponse
 			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: %v", err))
+				return
+			}
 			// Fetch the postEntry requested.
-			repostedPostEntry := utxoView.GetPostEntryForPostHash(post.PostHashHex)
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
 			if repostedPostEntry == nil {
-				return nil, fmt.Errorf("_getRepostPostEntry: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+				return nil, fmt.Errorf("SortMarketplace: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
 			}
 			// Get info regarding the readers interactions with the post
-			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, repostedPostEntry)
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
 			// Append to array for returning
 			posts = append(posts, post)
         }
