@@ -164,11 +164,11 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	}
 
 	var readerPublicKeyBytes []byte
-	var err error
+	var errr error
 	if requestData.ReaderPublicKeyBase58Check != "" {
-		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
-		if err != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", err))
+		readerPublicKeyBytes, _, errr = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if errr != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", errr))
 			return
 		}
 	}
@@ -533,8 +533,9 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			}
 			// Fetch the postEntry requested.
 			postEntry := utxoView.GetPostEntryForPostHash(postHash)
-			if repostedPostEntry == nil {
-				return nil, fmt.Errorf("SortMarketplace: Could not find postEntry for PostHashHex: #{postEntry.RepostedPostHash}")
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Could not find PostEntry for postHash"))
+				return
 			}
 			// Get info regarding the readers interactions with the post
 			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
