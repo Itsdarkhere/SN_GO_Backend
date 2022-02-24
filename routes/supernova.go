@@ -163,6 +163,8 @@ func CustomConnect() (*pgxpool.Pool, error) {
 
 type SendBackPostHashRequest struct {
 	PostHashHex                string `safeForLogging:"true"`
+	Username                string `safeForLogging:"true"`
+	CollectionName                string `safeForLogging:"true"`
 }
 
 func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Request) {
@@ -173,16 +175,58 @@ func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Reques
 		return
 	}
 
-	// Decode the postHash.
-	postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: %v", err))
+	if requestData.PostHashHex == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No postHashHex sent in request"))
 		return
 	}
+	postHashHex := requestData.PostHashHex
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No Username sent in request"))
+		return
+	}
+	username := requestData.Username
+	if requestData.CollectionName == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No CollectionName sent in request"))
+		return
+	}
+	collectionName := requestData.CollectionName
+
+	conn := CustomConnect();
+	connection, err := conn.Acquire(context.Background())
+	if err != nil {
+		fmt.Println("ERROR WITH CONNECTION")
+	}
+
+	defer conn.Close()
+	defer connection.Release()
+	
+	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v' FROM pg_posts 
+	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, postHashHex)
+	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection) ` + selectString 
+
+	// Query
+	rows, err := connection.Query(context.Background(), queryString)
+	if err != nil {
+        _AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: Error connecting to postgres: ", err))
+		return
+    }
+
+    for rows.Next() {
+		s := ""
+        if err := rows.Scan(&s); 
+		err != nil {
+            _AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: ERROR: ", err))
+			return
+        }
+    }
+    if err := rows.Err(); err != nil {
+        _AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: ERROR: ", err))
+		return
+    }
 
 	resp := { Response: postHash }
 	if err = json.NewEncoder(ww).Encode(resp); err != nil {
-		_AddInternalServerError(ww, fmt.Sprintf("SortMarketplace: Problem serializing object to JSON: %v", err))
+		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: Problem serializing object to JSON: %v", err))
 		return
 	}
 
