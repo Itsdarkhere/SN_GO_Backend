@@ -161,13 +161,13 @@ func CustomConnect() (*pgxpool.Pool, error) {
 
 */
 
-type SendBackPostHashRequest struct {
+type CreateCollectionRequest struct {
 	PostHashHex                string `safeForLogging:"true"`
 	Username                string `safeForLogging:"true"`
 	CollectionName                string `safeForLogging:"true"`
 }
 
-func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Request) {
+func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req, *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := SendBackPostHashRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
