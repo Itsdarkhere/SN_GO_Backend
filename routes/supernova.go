@@ -128,6 +128,65 @@ func CustomConnect() (*pgxpool.Pool, error) {
     }
 	return pool, nil
 }
+/*
+
+// Decode the postHash.
+	postHash := &lib.BlockHash{}
+	if requestData.PostHashHex != "" {
+		postHashBytes, err := hex.DecodeString(requestData.PostHashHex)
+		if err != nil || len(postHashBytes) != lib.HashSizeBytes {
+			_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Error parsing post hash %v: %v",
+				requestData.PostHashHex, err))
+			return
+		}
+		copy(postHash[:], postHashBytes)
+	} else {
+		_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Request missing PostHashHex"))
+		return
+	}
+
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Problem fetching utxoView: %v", err))
+		return
+	}
+
+	// Get the post entry.
+	postEntry := utxoView.GetPostEntryForPostHash(postHash)
+	if postEntry == nil {
+		_AddBadRequestError(ww, fmt.Sprintf(
+			"AdminPinPost: Problem getting postEntry for post hash: %v : %s", err, requestData.PostHashHex))
+		return
+	}
+
+*/
+
+type SendBackPostHashRequest struct {
+	PostHashHex                string `safeForLogging:"true"`
+}
+
+func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := SendBackPostHashRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SendBackPostHash: Error parsing request body: %v", err))
+		return
+	}
+
+	// Decode the postHash.
+	postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: %v", err))
+		return
+	}
+
+	resp := { Response: postHash }
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("SortMarketplace: Problem serializing object to JSON: %v", err))
+		return
+	}
+
+}
 
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
