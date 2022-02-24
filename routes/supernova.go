@@ -164,8 +164,10 @@ func CustomConnect() (*pgxpool.Pool, error) {
 type SendBackPostHashRequest struct {
 	PostHashHex                string `safeForLogging:"true"`
 }
-
-func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Request) {
+type SendBackPostHashResponse struct {
+	PostHash                *lib.BlockHash `safeForLogging:"true"`
+}
+func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := SendBackPostHashRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
@@ -174,13 +176,16 @@ func (fes *APIServer) SendBackPostHash(ww http.ResponseWriter, req, *http.Reques
 	}
 
 	// Decode the postHash.
-	postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+	postHash, err := GetPostHashFromPostHashHex(requestData.PostHashHex)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: %v", err))
 		return
 	}
 
-	resp := { Response: postHash }
+	resp := SendBackPostHashResponse { 
+		PostHash: postHash,
+	}
+
 	if err = json.NewEncoder(ww).Encode(resp); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("SortMarketplace: Problem serializing object to JSON: %v", err))
 		return
