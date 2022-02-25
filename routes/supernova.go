@@ -352,7 +352,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 			// Need a holder var for the bytea format
 			poster_public_key_bytea := new(PPKBytea)
             // Scan reads the values from the current row into tmp
-			if (sold_selected && (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first")) {
+			if (sold_selected && (requestData.OrderByType == "highest price first" || requestData.OrderByType == "lowest price first")) {
 				wasteValue := new(Waster)
 				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
@@ -366,7 +366,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					return
 				}
 
-			} else if (has_bids_selected && (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first")) {
+			} else if (has_bids_selected && (requestData.OrderByType == "highest price first" || requestData.OrderByType == "lowest price first")) {
 				wasteValue := new(Waster)
 				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
@@ -380,7 +380,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					return
 				}
 
-			} else if (requestData.SortType == "highest price first" || requestData.SortType == "lowest price first") {
+			} else if (requestData.OrderByType == "highest price first" || requestData.OrderByType == "lowest price first") {
 				wasteValue := new(Waster)
 				rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
