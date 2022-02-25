@@ -156,7 +156,7 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	hexArrayPGFormat := "("
 	// Loop through array and construct a string to use in insert
 	for i := 0; i < len(hexArray); i++ {
-		if (i + 1 == len(s)) {
+		if (i + 1 == len(hexArray)) {
 			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "'"
 		} else {
 			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "',"
