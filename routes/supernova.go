@@ -203,8 +203,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 	basic_select := `select encode(pg_posts.post_hash, 'hex') as post_hash, diamond_count, comment_count, 
 	like_count, poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data
-	from pg_sn_collections INNER JOIN pg_posts ON pg_sn_collections.post_hash = pg_posts.post_hash`
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data`
 
 	basic_from := ` FROM pg_sn_collections`
 
