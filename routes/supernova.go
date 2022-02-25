@@ -160,16 +160,18 @@ func CustomConnect() (*pgxpool.Pool, error) {
 	}
 
 */
-
+type CreateCollectionResponse struct {
+	Response string 
+}
 type CreateCollectionRequest struct {
 	PostHashHex                string `safeForLogging:"true"`
 	Username                string `safeForLogging:"true"`
 	CollectionName                string `safeForLogging:"true"`
 }
 
-func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req, *http.Request) {
+func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	requestData := SendBackPostHashRequest{}
+	requestData := CreateCollectionRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBackPostHash: Error parsing request body: %v", err))
 		return
@@ -191,15 +193,23 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req, *http.Reques
 	}
 	collectionName := requestData.CollectionName
 
-	conn := CustomConnect();
-	connection, err := conn.Acquire(context.Background())
+	// Get connection pool
+	dbPool, err := CustomConnect()
 	if err != nil {
-		fmt.Println("ERROR WITH CONNECTION")
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error getting pool: %v", err))
+		return
 	}
-
-	defer conn.Close()
-	defer connection.Release()
+	// get connection to pool
+	connection, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error cant connect to database: %v", err))
+		connection.Release()
+		return
+	}
 	
+	// Release connection once function returns
+	defer connection.Release();
+
 	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v' FROM pg_posts 
 	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, postHashHex)
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection) ` + selectString 
@@ -224,14 +234,17 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req, *http.Reques
 		return
     }
 
-	resp := SendBackPostHashResponse { 
-		PostHash: postHash,
+	resp := CreateCollectionResponse { 
+		Response: "Success",
 	}
 
 	if err = json.NewEncoder(ww).Encode(resp); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: Problem serializing object to JSON: %v", err))
 		return
 	}
+
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	connection.Release();
 
 }
 
