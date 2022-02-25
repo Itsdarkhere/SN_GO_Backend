@@ -128,45 +128,16 @@ func CustomConnect() (*pgxpool.Pool, error) {
     }
 	return pool, nil
 }
-/*
 
-// Decode the postHash.
-	postHash := &lib.BlockHash{}
-	if requestData.PostHashHex != "" {
-		postHashBytes, err := hex.DecodeString(requestData.PostHashHex)
-		if err != nil || len(postHashBytes) != lib.HashSizeBytes {
-			_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Error parsing post hash %v: %v",
-				requestData.PostHashHex, err))
-			return
-		}
-		copy(postHash[:], postHashBytes)
-	} else {
-		_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Request missing PostHashHex"))
-		return
-	}
-
-	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("AdminPinPost: Problem fetching utxoView: %v", err))
-		return
-	}
-
-	// Get the post entry.
-	postEntry := utxoView.GetPostEntryForPostHash(postHash)
-	if postEntry == nil {
-		_AddBadRequestError(ww, fmt.Sprintf(
-			"AdminPinPost: Problem getting postEntry for post hash: %v : %s", err, requestData.PostHashHex))
-		return
-	}
-
-*/
 type CreateCollectionResponse struct {
 	Response string 
 }
+
 type CreateCollectionRequest struct {
-	PostHashHex                string `safeForLogging:"true"`
+	PostHashHexArray        []string
 	Username                string `safeForLogging:"true"`
-	CollectionName                string `safeForLogging:"true"`
+	CollectionName          string `safeForLogging:"true"`
+	CollectionDescription   string 
 }
 
 func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request) {
@@ -177,11 +148,21 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 		return
 	}
 
-	if requestData.PostHashHex == "" {
+	if len(requestData.PostHashHexArray) < 1 {
 		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No postHashHex sent in request"))
 		return
 	}
-	postHashHex := requestData.PostHashHex
+	hexArray := requestData.PostHashHexArray
+	hexArrayPGFormat := "("
+	// Loop through array and construct a string to use in insert
+	for i := 0; i < len(hexArray); i++ {
+		if (i + 1 == len(s)) {
+			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "'"
+		} else {
+			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "',"
+		}
+	}
+	hexArrayPGFormat = hexArrayPGFormat + ")"
 	if requestData.Username == "" {
 		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No Username sent in request"))
 		return
@@ -193,26 +174,25 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	}
 	collectionName := requestData.CollectionName
 
-	// Get connection pool
-	dbPool, err := CustomConnect()
-	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error getting pool: %v", err))
+	if requestData.CollectionDescription == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("SendBackPostHash: No CollectionDescription sent in request"))
 		return
 	}
-	// get connection to pool
-	connection, err := dbPool.Acquire(context.Background())
+	collectionDescription := requestData.CollectionDescription
+
+	conn, err := CustomConnect();
 	if err != nil {
-		_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Error cant connect to database: %v", err))
-		connection.Release()
+		_AddBadRequestError(ww, fmt.Sprintf("SendBackPostHash: Error getting pool: %v", err))
 		return
+	}
+	connection, err := conn.Acquire(context.Background())
+	if err != nil {
+		fmt.Println("SendBackPostHash: ERROR WITH POSTGRES CONNECTION")
 	}
 	
-	// Release connection once function returns
-	defer connection.Release();
-
-	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v' FROM pg_posts 
-	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, postHashHex)
-	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection) ` + selectString 
+	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v', '%v' FROM pg_posts 
+	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, collectionDescription, hexArrayPGFormat)
+	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description) ` + selectString 
 
 	// Query
 	rows, err := connection.Query(context.Background(), queryString)
