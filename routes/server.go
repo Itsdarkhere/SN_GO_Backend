@@ -243,6 +243,7 @@ const (
 	// Custom Supernovas
 	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
 	RoutePathCreateCollection = "/api/v0/create-collection"
+	RoutePathSortCollection = "/api/v0/sort-collection"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -769,6 +770,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathCreateCollection,
 			fes.CreateCollection,
+			PublicAccess,
+		},
+		{
+			"SortCollection",
+			[]string{"POST", "OPTIONS"},
+			RoutePathSortCollection,
+			fes.SortCollection,
 			PublicAccess,
 		},
 		{
