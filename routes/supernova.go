@@ -218,13 +218,13 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 
 	basic_where := ` WHERE nft = true AND num_nft_copies != num_nft_copies_burned`
 
-	basic_group_by := " GROUP BY pg_posts.post_hash"
+	basic_group_by := " GROUP BY pg_posts.post_hash, collection, collection_description, banner_location"
 
 	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
 
-	basic_limit := ` LIMIT 30`
-
 	basic_order_by := " ORDER BY"
+
+	basic_limit := ` LIMIT 30`
 
 	// Switch for status 
 	switch requestData.Status {
