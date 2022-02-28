@@ -197,7 +197,7 @@ func (fes *APIServer) GetUserCollectionsData(ww http.ResponseWriter, req *http.R
         }
 
 		resp := GetUserCollectionsDataResponse {
-			UserCollectionData: collectionRows
+			UserCollectionData: collectionRows,
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetUserCollectionsData: Problem serializing object to JSON: %v", err))
