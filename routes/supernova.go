@@ -237,10 +237,13 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 		_AddInternalServerError(ww, fmt.Sprintf("SortCollection: No Username sent in request"))
 		return
 	}
+	username := requestData.Username
+	
 	if requestData.CollectionName == "" {
 		_AddInternalServerError(ww, fmt.Sprintf("SortCollection: No CollectionName sent in request"))
 		return
 	}
+	collectionName := requestData.CollectionName
 
 	// Get connection pool
 	dbPool, err := CustomConnect()
@@ -295,7 +298,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 
 	basic_inner_join := " INNER JOIN pg_posts ON pg_sn_collections.post_hash = pg_posts.post_hash"
 
-	basic_where := ` WHERE nft = true AND num_nft_copies != num_nft_copies_burned`
+	basic_where := fmt.Sprintf(` WHERE nft = true AND num_nft_copies != num_nft_copies_burned AND creator_name = '%v' AND collection = '%v'`, username, collectionName)
 
 	basic_group_by := " GROUP BY pg_posts.post_hash, collection, collection_description, banner_location"
 
