@@ -129,6 +129,85 @@ func CustomConnect() (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+type GetUserCollectionsDataRequest struct {
+	Username string
+}
+type GetUserCollectionsDataResponse struct {
+	UserCollectionData []*UserCollectionsResponse
+}
+type UserCollectionsResponse struct {
+	PostHashHex string `db:"post_hash"`
+	Collection string `db:"collection"`
+}
+func (fes *APIServer) GetUserCollectionsData(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetUserCollectionsDataRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error parsing request body: %v", err))
+		return
+	}
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetUserCollectionsData: No Username sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Query
+	rows, err := conn.Query(context.Background(), 
+	fmt.Sprintf("SELECT encode(post_hash, 'hex') as post_hash, collection FROM pg_sn_collections WHERE creator_name = %v", requestData.Username))
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error query failed: %v", err))
+		return
+	} else {
+
+		var collectionRows []*UserCollectionsResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			collectionResponse := new(UserCollectionsResponse)
+			rows.Scan(&collectionResponse.PostHashHex, &collectionResponse.Collection)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array for returning
+			collectionRows = append(collectionRows, collectionResponse)
+        }
+
+		resp := GetUserCollectionsDataResponse {
+			UserCollectionData: collectionRows
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetUserCollectionsData: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+
+}
 
 type SortCollectionRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
@@ -369,7 +448,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.LastAcceptedBidAmountNanos, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.LastAcceptedBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -383,7 +462,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.BidAmount, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.BidAmount)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -397,7 +476,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.MinBidAmountNanos, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.MinBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
