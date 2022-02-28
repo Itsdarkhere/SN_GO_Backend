@@ -369,7 +369,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.LastAcceptedBidAmountNanos, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.LastAcceptedBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -383,7 +383,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.BidAmount, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.BidAmount)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -397,7 +397,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &wasteValue.MinBidAmountNanos, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.MinBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
