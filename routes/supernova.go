@@ -170,7 +170,7 @@ func (fes *APIServer) GetUserCollectionsData(ww http.ResponseWriter, req *http.R
 
 	// Query
 	rows, err := conn.Query(context.Background(), 
-	fmt.Sprintf("SELECT encode(post_hash, 'hex') as post_hash, collection FROM pg_sn_collections WHERE creator_name = %v", requestData.Username))
+	fmt.Sprintf("SELECT encode(post_hash, 'hex') as post_hash, collection FROM pg_sn_collections WHERE creator_name = '%v'", requestData.Username))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error query failed: %v", err))
 		return
