@@ -154,6 +154,85 @@ func CustomConnectETH() (*pgxpool.Pool, error) {
     }
 	return poolETH, nil
 }
+
+type InsertIMXMetadataRequest {
+	Name string `db:"name"`
+	Description string `db:"description"`
+	Image string `db:"image"`
+	Image_url string `db:"image_url"`
+	Token_1 int `db:"token_1"`
+}
+func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertIMXMetadataRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.Name == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Name sent in request"))
+		return
+	}
+	name := requestData.Name
+	if requestData.Description == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Description sent in request"))
+		return
+	}
+	description := requestData.Description
+	if requestData.Image == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Image sent in request"))
+		return
+	}
+	image := requestData.Image
+	if requestData.Image_url == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Image_url sent in request"))
+		return
+	}
+	image_url := requestData.Image_url
+	if requestData.Token_1 == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Token_1 sent in request"))
+		return
+	}
+	token_1 := requestData.Token_1
+
+	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Unable to connect to pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Unable to get db connection: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	_, err = conn.Exec(context.Background(), 
+	fmt.Sprintf("INSERT INTO pg_eth_metadata (name, description, image, image_url, token_1) VALUES ('%v', 'v%', '%v', '%v', v%)", name, description, image, image_url, token_1))
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
 type GetIMXMetadataByIdResponse struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
@@ -174,7 +253,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	// Get connection pool, NEW SINCE WE ARE USING AN
+	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
 	dbPool, err := CustomConnectETH()
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Unable to connect to pool: %v", err))

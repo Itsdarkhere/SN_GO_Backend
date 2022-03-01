@@ -247,6 +247,7 @@ const (
 	RoutePathGetUserCollectionsData = "/api/v0/get-user-collections-data"
 	// IMX SUPERNOVAS
 	RoutePathGetIMXMetadataById = "/api/v0/imx/metadata"
+	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -787,6 +788,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"GET"},
 			RoutePathGetIMXMetadataById,
 			fes.GetIMXMetadataById,
+			PublicAccess,
+		},
+		{
+			"InsertIMXMetadata",
+			[]string{"POST", "OPTIONS"},
+			RoutePathInsertIMXMetadata,
+			fes.InsertIMXMetadata,
 			PublicAccess,
 		},
 		{
