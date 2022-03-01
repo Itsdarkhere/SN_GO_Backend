@@ -155,7 +155,7 @@ func CustomConnectETH() (*pgxpool.Pool, error) {
 	return poolETH, nil
 }
 
-type InsertIMXMetadataRequest {
+type InsertIMXMetadataRequest struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
@@ -190,7 +190,7 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 	image_url := requestData.Image_url
-	if requestData.Token_1 == "" {
+	if requestData.Token_1 == 0 {
 		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Token_1 sent in request"))
 		return
 	}
@@ -241,15 +241,15 @@ type GetIMXMetadataByIdResponse struct {
 	Token_1 int `db:"token_1"`
 }
 type getSingleIMXResponse struct {
-	IMXMetadata: *GetIMXMetadataByIdResponse
+	IMXMetadata *GetIMXMetadataByIdResponse
 }
 func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Request) {
 	// Regex to capture ID from URL
 	regex := regexp.MustCompile("\\d+$")
 	// Get ID
-	id := re.FindString(req.RequestURI)
+	id := regex.FindString(req.RequestURI)
 	if id == "" {
-		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Id not found in request URL: %v", err))
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Id not found in request URL:"))
 		return
 	}
 
@@ -273,7 +273,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 	// IMX response to store values in 
 	singleIMXResponse := new(GetIMXMetadataByIdResponse)
 
-	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT name, description, image, image_url, token_1 FROM pg_eth_metadata WHERE token_1 = '%v'", value))
+	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT name, description, image, image_url, token_1 FROM pg_eth_metadata WHERE token_1 = '%v'", id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in query: %v", err))
 		return
@@ -289,7 +289,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		}
 		// Response
 		resp := getSingleIMXResponse {
-			IMXMetadata: singleIMXResponse
+			IMXMetadata: singleIMXResponse,
 		}
 		// Serialize response to JSON
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
@@ -299,8 +299,6 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		// Just to make sure call it here too, calling it multiple times has no side-effects
 		conn.Release();
 	}	
-
-
 
 }
 type GetUserCollectionsDataRequest struct {
