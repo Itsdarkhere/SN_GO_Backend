@@ -283,12 +283,8 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 				return
 			}
 		}
-		// Response
-		resp := getSingleIMXResponse {
-			IMXMetadata: singleIMXResponse
-		}
 		// Serialize response to JSON
-		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		if err = json.NewEncoder(ww).Encode(singleIMXResponse); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("GetIMXMetadataById: Problem serializing object to JSON: %v", err))
 			return
 		}
