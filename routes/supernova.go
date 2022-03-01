@@ -160,7 +160,6 @@ type InsertIMXMetadataRequest {
 	Description string `db:"description"`
 	Image string `db:"image"`
 	Image_url string `db:"image_url"`
-	Token_1 int `db:"token_1"`
 }
 func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -190,11 +189,6 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 	image_url := requestData.Image_url
-	if requestData.Token_1 == "" {
-		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Token_1 sent in request"))
-		return
-	}
-	token_1 := requestData.Token_1
 
 	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
 	dbPool, err := CustomConnectETH()
@@ -214,7 +208,10 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	defer conn.Release();
 
 	_, err = conn.Exec(context.Background(), 
-	fmt.Sprintf("INSERT INTO pg_eth_metadata (name, description, image, image_url, token_1) VALUES ('%v', 'v%', '%v', '%v', %v)", name, description, image, image_url, token_1))
+	fmt.Sprintf(
+		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id) 
+		VALUES ('%v', 'v%', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata))`, 
+		name, description, image, image_url))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
@@ -238,7 +235,7 @@ type GetIMXMetadataByIdResponse struct {
 	Description string `db:"description"`
 	Image string `db:"image"`
 	Image_url string `db:"image_url"`
-	Token_1 int `db:"token_1"`
+	Token_id int `db:"token_id"`
 }
 type getSingleIMXResponse struct {
 	IMXMetadata: *GetIMXMetadataByIdResponse
@@ -271,7 +268,8 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 	// IMX response to store values in 
 	singleIMXResponse := new(GetIMXMetadataByIdResponse)
 
-	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT name, description, image, image_url, token_1 FROM pg_eth_metadata WHERE token_1 = '%v'", value))
+	rows, err := conn.Query(context.Background(), 
+	fmt.Sprintf("SELECT name, description, image, image_url, token_id FROM pg_eth_metadata WHERE token_id = '%v'", value))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in query: %v", err))
 		return
@@ -279,7 +277,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		defer rows.Close()
 
 		for rows.Next() {
-			rows.Scan(&singleIMXResponse.Name, &singleIMXResponse.Description, &singleIMXResponse.Image, &singleIMXResponse.Image_url, &singleIMXResponse.Token_1)
+			rows.Scan(&singleIMXResponse.Name, &singleIMXResponse.Description, &singleIMXResponse.Image, &singleIMXResponse.Image_url, &singleIMXResponse.Token_id)
 			if rows.Err() != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in scan: %v", err))
 				return
