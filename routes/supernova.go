@@ -214,7 +214,7 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	defer conn.Release();
 
 	_, err = conn.Exec(context.Background(), 
-	fmt.Sprintf("INSERT INTO pg_eth_metadata (name, description, image, image_url, token_1) VALUES ('%v', 'v%', '%v', '%v', v%)", name, description, image, image_url, token_1))
+	fmt.Sprintf("INSERT INTO pg_eth_metadata (name, description, image, image_url, token_1) VALUES ('%v', 'v%', '%v', '%v', %v)", name, description, image, image_url, token_1))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
