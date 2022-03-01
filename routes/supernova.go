@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"	
 	"context"
+	"regexp"
 	"encoding/base64"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/deso-protocol/core/lib"
@@ -128,7 +129,101 @@ func CustomConnect() (*pgxpool.Pool, error) {
     }
 	return pool, nil
 }
+// imx metadata connection pool
+var poolETH *pgxpool.Pool
 
+func CustomConnectETH() (*pgxpool.Pool, error) {
+	// If we have a pool just return
+	if poolETH != nil {
+		return poolETH, nil
+	}
+
+	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-data-db"
+	config, err := pgxpool.ParseConfig(DATABASE_URL)
+	if err != nil {
+		return nil, err
+	}
+	// Configs, Database dude said this is not needed
+	//config.MaxConnIdleTime = 120 * time.Second
+	//config.HealthCheckPeriod = 120 * time.Second
+	//config.MaxConnIdleTime = 5 * time.Minute
+	// setting pool
+	poolETH, err = pgxpool.ConnectConfig(context.Background(), config)
+	if err != nil {
+        return nil, err
+    }
+	return poolETH, nil
+}
+type GetIMXMetadataByIdResponse struct {
+	Name string `db:"name"`
+	Description string `db:"description"`
+	Image string `db:"image"`
+	Image_url string `db:"image_url"`
+	Token_1 int `db:"token_1"`
+}
+type getSingleIMXResponse struct {
+	IMXMetadata: *GetIMXMetadataByIdResponse
+}
+func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Request) {
+	// Regex to capture ID from URL
+	regex := regexp.MustCompile("\\d+$")
+	// Get ID
+	id := re.FindString(req.RequestURI)
+	if id == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Id not found in request URL: %v", err))
+		return
+	}
+
+	// Get connection pool, NEW SINCE WE ARE USING AN
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Unable to connect to pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Unable to get db connection: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// IMX response to store values in 
+	singleIMXResponse := new(GetIMXMetadataByIdResponse)
+
+	rows, err := conn.Query(context.Background(), fmt.Sprintf("SELECT name, description, image, image_url, token_1 FROM pg_eth_metadata WHERE token_1 = '%v'", value))
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in query: %v", err))
+		return
+	} else {
+		defer rows.Close()
+
+		for rows.Next() {
+			rows.Scan(&singleIMXResponse.Name, &singleIMXResponse.Description, &singleIMXResponse.Image, &singleIMXResponse.Image_url, &singleIMXResponse.Token_1)
+			if rows.Err() != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in scan: %v", err))
+				return
+			}
+		}
+		// Response
+		resp := getSingleIMXResponse {
+			IMXMetadata: singleIMXResponse
+		}
+		// Serialize response to JSON
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetIMXMetadataById: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}	
+
+
+
+}
 type GetUserCollectionsDataRequest struct {
 	Username string
 }
@@ -238,7 +333,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 		return
 	}
 	username := requestData.Username
-	
+
 	if requestData.CollectionName == "" {
 		_AddInternalServerError(ww, fmt.Sprintf("SortCollection: No CollectionName sent in request"))
 		return
