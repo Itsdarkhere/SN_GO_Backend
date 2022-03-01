@@ -161,6 +161,9 @@ type InsertIMXMetadataRequest {
 	Image string `db:"image"`
 	Image_url string `db:"image_url"`
 }
+type InsertIMXResponse struct {
+	Response int 
+}
 func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := InsertIMXMetadataRequest{}
@@ -207,18 +210,19 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	// Release connection once function returns
 	defer conn.Release();
 
-	_, err = conn.Exec(context.Background(), 
+	id := 0
+	err := conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
 		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id) 
-		VALUES ('%v', 'v%', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata))`, 
-		name, description, image, image_url))
+		VALUES ('%v', 'v%', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata)) RETURNING token_id`, 
+		name, description, image, image_url)).Scan(&id)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
 	}
 
-	resp := CreateCollectionResponse { 
-		Response: "Success",
+	resp := InsertIMXResponse { 
+		Response: id,
 	}
 
 	// Serialize response to JSON
