@@ -244,12 +244,10 @@ type getSingleIMXResponse struct {
 	IMXMetadata: *GetIMXMetadataByIdResponse
 }
 func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Request) {
-	// Regex to capture ID from URL
-	regex := regexp.MustCompile("\\d+$")
-	// Get ID
-	id := re.FindString(req.RequestURI)
-	if id == "" {
-		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Id not found in request URL: %v", err))
+	vars := mux.Vars(req)
+	id, idExists := vars["id"]
+	if !idExists {
+		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Missing id"))
 		return
 	}
 
