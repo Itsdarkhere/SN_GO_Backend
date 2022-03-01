@@ -786,7 +786,7 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 		{
 			"GetIMXMetadataById",
 			[]string{"GET"},
-			RoutePathGetIMXMetadataById,
+			RoutePathGetIMXMetadataById + "/{id:[0-9]{1,5}}",
 			fes.GetIMXMetadataById,
 			PublicAccess,
 		},
