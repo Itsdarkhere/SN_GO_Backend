@@ -181,6 +181,9 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	collectionName := requestData.collectionName
+	collectionCreatorName := requestData.collectionCreatorName
+
 	// Get connection pool
 	dbPool, err := CustomConnect()
 	if err != nil {
@@ -201,17 +204,47 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 	// Store response in this
 	collectionInfoResponse := new(GetCollectionInfoResponse)
 
+	// Count amount of pieces
+	queryStart := fmt.Sprintf("SELECT COUNT(*) as pieces, ")
+
+	// Get trading volume
+	subQueryOne := fmt.Sprintf(`
+	(
+		SELECT SUM(bid_amount_nanos)
+		FROM pg_sn_collections
+		INNER JOIN pg_metadata_accept_nft_bids
+		ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
+		WHERE collection = '%v' AND creator_name = '%v'
+	) as trading_vol,`, collectionName, collectionCreatorName)
+
+	// Get floor price, -1 if none are for sale
+	subQueryTwo := fmt.Sprintf(`
+	(
+		SELECT COALESCE(MIN(min_bid_amount_nanos), -1)
+		FROM pg_sn_collections
+		INNER JOIN pg_nfts 
+		ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
+		WHERE collection = '%v' AND creator_name = '%v' AND for_sale = true
+	) as floor_price,`, collectionName, collectionCreatorName)
+	
+	// Count amount of owners
+	subQueryThree := fmt.Sprintf(`
+	(
+		SELECT COUNT(DISTINCT owner_pkid)
+		FROM pg_sn_collections
+		INNER JOIN pg_nfts
+		ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
+		WHERE collection = '%v' AND creator_name = '%v'
+	) as owners `, collectionName, collectionCreatorName)
+
+	queryEnd := fmt.Sprintf(`FROM pg_sn_collections 
+	WHERE collection = '%v' AND creator_name = '%v'`, collectionName, collectionCreatorName)
+
+	// Combine strings to a final version to use
+	queryString := queryStart + subQueryOne + subQueryTwo + subQueryThree + queryEnd
+
 	// Query
-	rows, err := conn.Query(context.Background(), 
-	fmt.Sprintf(`SELECT COUNT(*) as pieces, COUNT(DISTINCT owner_pkid) as owners, 
-	MIN(min_bid_amount_nanos) as floor_price,
-	SUM(bid_amount_nanos) as trading_vol
-	FROM pg_sn_collections
-	INNER JOIN pg_posts ON pg_sn_collections.post_hash = pg_posts.post_hash
-	INNER JOIN pg_nfts ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
-	INNER JOIN pg_metadata_accept_nft_bids 
-	ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
-	WHERE collection = '%v' AND creator_name = '%v'`, requestData.CollectionName, requestData.CollectionCreatorName))
+	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error query failed: %v", err))
 		return
