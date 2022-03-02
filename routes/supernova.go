@@ -215,7 +215,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		INNER JOIN pg_metadata_accept_nft_bids
 		ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
 		WHERE collection = '%v' AND creator_name = '%v'
-	) as trading_vol,`, collectionName, collectionCreatorName)
+	) as trading_volume,`, collectionName, collectionCreatorName)
 
 	// Get floor price, -1 if none are for sale
 	subQueryTwo := fmt.Sprintf(`
@@ -235,7 +235,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		INNER JOIN pg_nfts
 		ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
 		WHERE collection = '%v' AND creator_name = '%v'
-	) as owners `, collectionName, collectionCreatorName)
+	) as owners_amount `, collectionName, collectionCreatorName)
 
 	queryEnd := fmt.Sprintf(`FROM pg_sn_collections 
 	WHERE collection = '%v' AND creator_name = '%v'`, collectionName, collectionCreatorName)
@@ -255,8 +255,8 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 
         // Next prepares the next row for reading.
         for rows.Next() {
-			rows.Scan(&collectionInfoResponse.Pieces, &collectionInfoResponse.OwnersAmount, 
-				&collectionInfoResponse.FloorPrice, &collectionInfoResponse.TradingVolume)
+			rows.Scan(&collectionInfoResponse.Pieces, &collectionInfoResponse.TradingVolume, 
+				&collectionInfoResponse.FloorPrice, &collectionInfoResponse.OwnersAmount)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
