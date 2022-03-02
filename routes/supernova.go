@@ -240,7 +240,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		conn.Release();
 	}
 }
-type InsertIMXMetadataRequest {
+type InsertIMXMetadataRequest struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
