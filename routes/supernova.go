@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"	
 	"context"
-	"regexp"
+	"github.com/gorilla/mux"
 	"encoding/base64"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/deso-protocol/core/lib"
@@ -329,10 +329,10 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	defer conn.Release();
 
 	id := 0
-	err := conn.QueryRow(context.Background(), 
+	err = conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
 		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id) 
-		VALUES ('%v', 'v%', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata)) RETURNING token_id`, 
+		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata)) RETURNING token_id`, 
 		name, description, image, image_url)).Scan(&id)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
@@ -360,7 +360,7 @@ type GetIMXMetadataByIdResponse struct {
 	Token_id int `db:"token_id"`
 }
 type getSingleIMXResponse struct {
-	IMXMetadata: *GetIMXMetadataByIdResponse
+	IMXMetadata *GetIMXMetadataByIdResponse
 }
 func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
@@ -391,7 +391,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 	singleIMXResponse := new(GetIMXMetadataByIdResponse)
 
 	rows, err := conn.Query(context.Background(), 
-	fmt.Sprintf("SELECT name, description, image, image_url, token_id FROM pg_eth_metadata WHERE token_id = '%v'", value))
+	fmt.Sprintf("SELECT name, description, image, image_url, token_id FROM pg_eth_metadata WHERE token_id = '%v'", id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in query: %v", err))
 		return
@@ -413,8 +413,6 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		// Just to make sure call it here too, calling it multiple times has no side-effects
 		conn.Release();
 	}	
-
-
 
 }
 type GetUserCollectionsDataRequest struct {
