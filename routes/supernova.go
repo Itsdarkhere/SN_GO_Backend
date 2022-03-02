@@ -161,7 +161,7 @@ type GetCollectionInfoRequest struct {
 type GetCollectionInfoResponse struct {
 	Pieces int `db:"pieces"`
 	OwnersAmount int `db:"owners_amount"`
-	FloorPrice uint64 `db:"floor_price"`
+	FloorPrice int64 `db:"floor_price"`
 	TradingVolume uint64 `db:"trading_volume"`
 }
 func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Request) {
