@@ -154,8 +154,93 @@ func CustomConnectETH() (*pgxpool.Pool, error) {
     }
 	return poolETH, nil
 }
+type GetCollectionInfoRequest struct {
+	CollectionName string 
+	CollectionCreatorName string 
+}
+type GetCollectionInfoResponse struct {
+	Pieces int `db:"pieces"`
+	OwnersAmount int `db:"owners_amount"`
+	FloorPrice uint64 `db:"floor_price"`
+	TradingVolume uint64 `db:"trading_volume"`
+}
+func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetCollectionInfoRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.CollectionName == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetCollectionInfo: No CollectionName sent in request"))
+		return
+	}
+	if requestData.CollectionCreatorName == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetCollectionInfo: No CollectionCreatorName sent in request"))
+		return
+	}
 
-type InsertIMXMetadataRequest struct {
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Store response in this
+	collectionInfoResponse := new(GetCollectionInfoResponse)
+
+	// Query
+	rows, err := conn.Query(context.Background(), 
+	fmt.Sprintf(`SELECT COUNT(*) as pieces, COUNT(DISTINCT owner_pkid) as owners, 
+	MIN(min_bid_amount_nanos) as floor_price,
+	SUM(bid_amount_nanos) as trading_vol
+	FROM pg_sn_collections
+	INNER JOIN pg_posts ON pg_sn_collections.post_hash = pg_posts.post_hash
+	INNER JOIN pg_nfts ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
+	INNER JOIN pg_metadata_accept_nft_bids 
+	ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
+	WHERE collection = '%v' AND creator_name = '%v'`, requestData.CollectionName, requestData.CollectionCreatorName))
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&collectionInfoResponse.Pieces, &collectionInfoResponse.OwnersAmount, 
+				&collectionInfoResponse.FloorPrice, &collectionInfoResponse.TradingVolume)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetCollectionInfo: Error scanning to struct: %v", err))
+				return
+			}
+        }
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(collectionInfoResponse); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetCollectionInfo: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type InsertIMXMetadataRequest {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
