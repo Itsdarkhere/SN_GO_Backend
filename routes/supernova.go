@@ -181,8 +181,8 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	collectionName := requestData.collectionName
-	collectionCreatorName := requestData.collectionCreatorName
+	collectionName := requestData.CollectionName
+	collectionCreatorName := requestData.CollectionCreatorName
 
 	// Get connection pool
 	dbPool, err := CustomConnect()
