@@ -242,9 +242,11 @@ const (
 
 	// Custom Supernovas
 	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
+	// Supernovas Collections
 	RoutePathCreateCollection = "/api/v0/create-collection"
 	RoutePathSortCollection = "/api/v0/sort-collection"
 	RoutePathGetUserCollectionsData = "/api/v0/get-user-collections-data"
+	RoutePathGetCollectionInfo = "/api/v0/get-collection-info"
 	// IMX SUPERNOVAS
 	RoutePathGetIMXMetadataById = "/api/v0/imx/metadata"
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
@@ -795,6 +797,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathInsertIMXMetadata,
 			fes.InsertIMXMetadata,
+			PublicAccess,
+		},
+		{
+			"GetCollectionInfo",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetCollectionInfo,
+			fes.GetCollectionInfo,
 			PublicAccess,
 		},
 		{
