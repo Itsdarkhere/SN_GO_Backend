@@ -211,7 +211,7 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	defer conn.Release();
 
 	id := 0
-	err := conn.QueryRow(context.Background(), 
+	err = conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
 		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id) 
 		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata)) RETURNING token_id`, 
