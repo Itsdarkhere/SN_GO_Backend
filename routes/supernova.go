@@ -510,6 +510,7 @@ type SortCollectionResponse struct {
 	CollectionName string
 	CollectionDescription string
 	CollectionBannerLocation string
+	CollectionProfilePicLocation string
 }
 
 func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) {
@@ -578,7 +579,8 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 	basic_select := `select encode(pg_posts.post_hash, 'hex') as post_hash, diamond_count, comment_count, 
 	like_count, poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data, collection, collection_description, banner_location`
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data, collection, 
+	collection_description, banner_location, pp_location`
 
 	basic_from := ` FROM pg_sn_collections`
 
@@ -586,7 +588,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 
 	basic_where := fmt.Sprintf(` WHERE nft = true AND num_nft_copies != num_nft_copies_burned AND creator_name = '%v' AND collection = '%v'`, username, collectionName)
 
-	basic_group_by := " GROUP BY pg_posts.post_hash, collection, collection_description, banner_location"
+	basic_group_by := " GROUP BY pg_posts.post_hash, collection, collection_description, banner_location, pp_location"
 
 	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
 
@@ -709,6 +711,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 	collection := ""
 	collection_description := ""
 	banner_location := ""
+	pp_location := ""
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -737,7 +740,8 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.LastAcceptedBidAmountNanos)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &pp_location,
+					 &wasteValue.LastAcceptedBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -751,7 +755,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.BidAmount)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, pp_location, &wasteValue.BidAmount)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -765,7 +769,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &wasteValue.MinBidAmountNanos)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &pp_location, &wasteValue.MinBidAmountNanos)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -778,7 +782,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 					&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 					&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 					&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location)
+					&post.NumNFTCopiesBurned, &post.PostExtraData, &collection, &collection_description, &banner_location, &pp_location)
 				// Check for errors
 				if rows.Err() != nil {
 					// if any error occurred while reading rows.
@@ -859,6 +863,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 			CollectionName: collection,
 			CollectionDescription: collection_description,
 			CollectionBannerLocation: banner_location,
+			CollectionProfilePicLocation: pp_location,
 		}
 		if err = json.NewEncoder(ww).Encode(resp); err != nil {
 			_AddInternalServerError(ww, fmt.Sprintf("SortCollection: Problem serializing object to JSON: %v", err))
@@ -879,6 +884,7 @@ type CreateCollectionRequest struct {
 	CollectionName          string `safeForLogging:"true"`
 	CollectionDescription   string 
 	CollectionBannerLocation string
+	CollectionProfilePicLocation string
 }
 
 func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request) {
@@ -927,6 +933,12 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	}
 	collectionBannerLocation := requestData.CollectionBannerLocation
 
+	if requestData.CollectionProfilePicLocation == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("CreateCollection: No CollectionBannerLocation sent in request"))
+		return
+	}
+	collectionProfilePicLocation := requestData.CollectionProfilePicLocation
+
 	conn, err := CustomConnect();
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("CreateCollection: Error getting pool: %v", err))
@@ -937,9 +949,9 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 		fmt.Println("CreateCollection: ERROR WITH POSTGRES CONNECTION")
 	}
 	
-	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v', '%v', '%v' FROM pg_posts 
-	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, collectionDescription, collectionBannerLocation, hexArrayPGFormat)
-	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location) ` + selectString 
+	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v', '%v', '%v', '%v' FROM pg_posts 
+	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, collectionDescription, collectionBannerLocation, collectionProfilePicLocation, hexArrayPGFormat)
+	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
 
 	// Query
 	rows, err := connection.Query(context.Background(), queryString)
