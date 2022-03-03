@@ -210,7 +210,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 	// Get trading volume
 	subQueryOne := fmt.Sprintf(`
 	(
-		SELECT SUM(bid_amount_nanos)
+		SELECT COALESCE(SUM(bid_amount_nanos), 0)
 		FROM pg_sn_collections
 		INNER JOIN pg_metadata_accept_nft_bids
 		ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
