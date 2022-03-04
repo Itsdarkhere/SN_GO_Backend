@@ -1056,6 +1056,9 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -1599,6 +1602,9 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -1870,6 +1876,9 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -2023,6 +2032,9 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			}
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
@@ -2238,6 +2250,9 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			}
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
