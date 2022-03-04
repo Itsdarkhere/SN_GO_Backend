@@ -154,6 +154,254 @@ func CustomConnectETH() (*pgxpool.Pool, error) {
     }
 	return poolETH, nil
 }
+
+type InsertIntoCollectionRequest struct {
+	PostHashHex string
+	Username string
+	Collection string 
+}
+func (fes *APIServer) InsertIntoCollection(ww http.ResponseWriter, req *http.Request) {
+
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertIntoCollectionRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.PostHashHex == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoCollection: No CollectionName sent in request"))
+		return
+	}
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoCollection: No CollectionName sent in request"))
+		return
+	}
+	if requestData.Collection == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoCollection: No CollectionName sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`
+	INSERT INTO pg_sn_collections(collection, creator_name, collection_description, banner_location, pp_location, post_hash)
+	SELECT collection, creator_name, collection_description, banner_location, pp_location,
+	(
+		SELECT post_hash FROM pg_posts
+		WHERE encode(pg_posts.post_hash, 'hex') = '%v'
+		LIMIT 1
+	) as post_hash
+	FROM pg_sn_collections
+	WHERE creator_name = '%v' AND collection = '%v'
+	LIMIT 1;
+	` requestData.PostHashHex, requestData.Username, requestData.Collection)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoCollection: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
+func (fes *APIServer) GetAllUserCollectionNames(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetAllUserCollectionsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollectionNames: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetAllUserCollectionNames: No CollectionName sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollectionNames: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollectionNames: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := fmt.Sprintf(`
+	SELECT DISTINCT collection
+	FROM pg_sn_collections WHERE creator_name = '%v'
+	`, requestData.Username)
+
+	// Store response in this
+	userCollectionNames := []*string
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollectionNames: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual collection name
+		userCollection := ""
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&userCollection)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollectionNames: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			userCollectionNames = append(userCollectionNames, userCollection)
+        }
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(userCollectionNames); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetAllUserCollectionNames: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+
+}
+type GetAllUserCollectionsRequest struct {
+	Username string
+}
+type GetAllUserCollectionsResponse struct {
+	CollectionName string
+	CollectionDescription string
+	CollectionBannerLocation string
+	CollectionProfilePicLocation string
+	FloorPrice int64
+	Pieces int
+}
+func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetAllUserCollectionsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollections: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetAllUserCollections: No CollectionName sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollections: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollections: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := fmt.Sprintf(`SELECT DISTINCT ON(collection) collection,
+	(
+			SELECT COALESCE(MIN(min_bid_amount_nanos), -1)
+			FROM pg_sn_collections AS b
+			INNER JOIN pg_nfts 
+			ON b.post_hash = pg_nfts.nft_post_hash
+			WHERE for_sale = true and b.collection = c.collection
+	) AS floor_price, 
+	(
+			SELECT COUNT(*)
+			FROM pg_sn_collections AS b
+			WHERE b.collection = c.collection
+	) AS pieces, 
+	creator_name, collection_description, banner_location, pp_location
+	FROM pg_sn_collections AS c WHERE creator_name = '%v'`, requestData.Username)
+
+	// Store response in this
+	userCollectionResponses []*GetAllUserCollectionsResponse
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollections: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual rows in this
+		userCollectionsResponse := new(GetAllUserCollectionsResponse)
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&userCollectionsResponse.Collection, &userCollectionsResponse.FloorPrice, &userCollectionsResponse.Pieces,
+				&userCollectionsResponse.CollectionCreatorName, &userCollectionsResponse.CollectionDescription, &userCollectionsResponse.CollectionBannerLocation,
+				&userCollectionsResponse.CollectionProfilePicLocation)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetAllUserCollections: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			userCollectionResponses = append(userCollectionResponses, userCollectionsResponse)
+        }
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(userCollectionResponses); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetAllUserCollections: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
 type GetCollectionInfoRequest struct {
 	CollectionName string 
 	CollectionCreatorName string 
@@ -808,6 +1056,9 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -1351,6 +1602,9 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -1622,6 +1876,9 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
 			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
 			post.Body = content.Body
@@ -1775,6 +2032,9 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			}
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
@@ -1990,6 +2250,9 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			}
 			if post.PostExtraData["arweaveAudioSrc"] != "" {
 				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
