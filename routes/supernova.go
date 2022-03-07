@@ -30,6 +30,7 @@ const (
 	categoryImage = "extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL AND"
 	categoryVideo = "extra_data->>'arweaveVideoSrc' != '' AND"
 	categoryAudio = "extra_data->>'arweaveAudioSrc' != '' AND"
+	category3D = "extra_data->>'arweaveModelSrc' != '' AND"
 	categoryFreshDrops = ""
 	categoryCommunityFavourites = "true"
 )
@@ -527,6 +528,8 @@ type InsertIMXMetadataRequest struct {
 	Description string `db:"description"`
 	Image string `db:"image"`
 	Image_url string `db:"image_url"`
+	Category string `db:"category"`
+	PostHashHex string `db:"post_hash"`
 }
 type InsertIMXResponse struct {
 	Response int 
@@ -559,6 +562,16 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 	image_url := requestData.Image_url
+	if requestData.Category == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No Category sent in request"))
+		return
+	}
+	category := requestData.Category
+	if requestData.PostHashHex == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIMXMetadata: No PostHashHex sent in request"))
+		return
+	}
+	postHashHex := requestData.PostHashHex
 
 	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
 	dbPool, err := CustomConnectETH()
@@ -580,9 +593,9 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	id := 0
 	err = conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
-		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id) 
-		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata)) RETURNING token_id`, 
-		name, description, image, image_url)).Scan(&id)
+		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, description, post_hash) 
+		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata), '%v', '%v') RETURNING token_id`, 
+		name, description, image, image_url, description, postHashHex)).Scan(&id)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
@@ -607,6 +620,8 @@ type GetIMXMetadataByIdResponse struct {
 	Image string `db:"image"`
 	Image_url string `db:"image_url"`
 	Token_id int `db:"token_id"`
+	Category string `db:"category"`
+	PostHashHex string `db:"post_hash"`
 }
 type getSingleIMXResponse struct {
 	IMXMetadata *GetIMXMetadataByIdResponse
@@ -640,7 +655,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 	singleIMXResponse := new(GetIMXMetadataByIdResponse)
 
 	rows, err := conn.Query(context.Background(), 
-	fmt.Sprintf("SELECT name, description, image, image_url, token_id FROM pg_eth_metadata WHERE token_id = '%v'", id))
+	fmt.Sprintf("SELECT name, description, image, image_url, token_id, category, post_hash FROM pg_eth_metadata WHERE token_id = '%v'", id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in query: %v", err))
 		return
@@ -648,7 +663,7 @@ func (fes *APIServer) GetIMXMetadataById(ww http.ResponseWriter, req *http.Reque
 		defer rows.Close()
 
 		for rows.Next() {
-			rows.Scan(&singleIMXResponse.Name, &singleIMXResponse.Description, &singleIMXResponse.Image, &singleIMXResponse.Image_url, &singleIMXResponse.Token_id)
+			rows.Scan(&singleIMXResponse.Name, &singleIMXResponse.Description, &singleIMXResponse.Image, &singleIMXResponse.Image_url, &singleIMXResponse.Token_id, &singleIMXResponse.Category, &singleIMXResponse.PostHashHex)
 			if rows.Err() != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetIMXMetadataById: Error in scan: %v", err))
 				return
@@ -1485,12 +1500,15 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
-		case "images video":
+		case "3d":
+			basic_where = basic_where + " AND extra_data->>'arweaveModelSrc' != ''"
+		/*case "images video":
 			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE) OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "images music":
 			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE)"
 		case "music video":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != '' OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
+		*/
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in format switch")
 			return
@@ -2148,6 +2166,8 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			categoryString = categoryVideo
 		case "audio":
 			categoryString = categoryAudio
+		case "model":
+			categoryString = category3D
 		default:
 			_AddBadRequestError(ww, "GetNFTsByCategory: Error invalid category type")
 			return
