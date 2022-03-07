@@ -210,9 +210,9 @@ func (fes *APIServer) InsertIntoCollection(ww http.ResponseWriter, req *http.Req
 	FROM pg_sn_collections
 	WHERE creator_name = '%v' AND collection = '%v'
 	LIMIT 1;
-	` requestData.PostHashHex, requestData.Username, requestData.Collection)
+	`, requestData.PostHashHex, requestData.Username, requestData.Collection)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Insert failed: %v", err))
 		return
@@ -268,7 +268,7 @@ func (fes *APIServer) GetAllUserCollectionNames(ww http.ResponseWriter, req *htt
 	`, requestData.Username)
 
 	// Store response in this
-	userCollectionNames := []*string
+	var userCollectionNames []string
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -309,12 +309,13 @@ type GetAllUserCollectionsRequest struct {
 	Username string
 }
 type GetAllUserCollectionsResponse struct {
-	CollectionName string
-	CollectionDescription string
-	CollectionBannerLocation string
-	CollectionProfilePicLocation string
-	FloorPrice int64
-	Pieces int
+	Collection string `db:"collection"`
+	CollectionCreatorName string `db:"creator_name"`
+	CollectionDescription string `db:"collection_description"`
+	CollectionBannerLocation string `db:"banner_location"`
+	CollectionProfilePicLocation string `db:"pp_location"`
+	FloorPrice int64 `db:"floor_price"`
+	Pieces int `db:"pieces"`
 }
 func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -364,7 +365,7 @@ func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Re
 	FROM pg_sn_collections AS c WHERE creator_name = '%v'`, requestData.Username)
 
 	// Store response in this
-	userCollectionResponses []*GetAllUserCollectionsResponse
+	var userCollectionResponses []*GetAllUserCollectionsResponse
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
