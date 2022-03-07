@@ -1484,12 +1484,15 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "music":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
-		case "images video":
+		case "3d":
+			basic_where = basic_where + " AND extra_data->>'arweaveModelSrc' != ''"
+		/*case "images video":
 			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE) OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "images music":
 			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE)"
 		case "music video":
 			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != '' OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
+		*/
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in format switch")
 			return
