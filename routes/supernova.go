@@ -524,6 +524,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 }
 type UpdateIMXMetadataPostHashRequest struct {
 	Token_id int
+	PostHashHex string
 }
 func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -534,7 +535,12 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 	}
 	// Confirm we have all needed fields
 	if requestData.Token_id == "" {
-		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No Name sent in request"))
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No Token_id sent in request"))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.PostHashHex == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No PostHashHex sent in request"))
 		return
 	}
 	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
@@ -556,7 +562,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 
 	id := 0
 	err = conn.Exec(context.Background(), 
-	fmt.Sprintf("UPDATE pg_eth_metadata SET post_hash = 'hash' WHERE token_id = '%v'", requestData.Token_id))
+	fmt.Sprintf("UPDATE pg_eth_metadata SET post_hash = '%v' WHERE token_id = '%v'", requestData.PostHashHex, requestData.Token_id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Update failed: %v", err))
 		return
