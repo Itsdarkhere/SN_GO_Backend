@@ -253,6 +253,7 @@ const (
 	// IMX SUPERNOVAS
 	RoutePathGetIMXMetadataById = "/api/v0/imx/metadata"
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
+	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -786,6 +787,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathSortCollection,
 			fes.SortCollection,
+			PublicAccess,
+		},
+		{
+			"UpdateIMXMetadataPostHash",
+			[]string{"POST", "OPTIONS"},
+			RoutePathUpdateIMXMetadataPostHash,
+			fes.UpdateIMXMetadataPostHash,
 			PublicAccess,
 		},
 		{

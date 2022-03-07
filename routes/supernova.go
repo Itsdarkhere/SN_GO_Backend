@@ -523,7 +523,65 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		conn.Release();
 	}
 }
-type InsertIMXMetadataRequest struct {
+type UpdateIMXMetadataPostHashRequest struct {
+	Token_id int
+	PostHashHex string
+}
+func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := UpdateIMXMetadataPostHashRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.Token_id == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No Token_id sent in request"))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.PostHashHex == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No PostHashHex sent in request"))
+		return
+	}
+	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Unable to connect to pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Unable to get db connection: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	id := 0
+	err = conn.Exec(context.Background(), 
+	fmt.Sprintf("UPDATE pg_eth_metadata SET post_hash = '%v' WHERE token_id = '%v'", requestData.PostHashHex, requestData.Token_id))
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Update failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+}
+type InsertIMXMetadataRequest {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
