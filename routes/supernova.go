@@ -595,7 +595,7 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	fmt.Sprintf(
 		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, description, post_hash) 
 		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata), '%v', '%v') RETURNING token_id`, 
-		name, description, image, image_url, description, postHashHex)).Scan(&id)
+		name, description, image, image_url, category, postHashHex)).Scan(&id)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
