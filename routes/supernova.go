@@ -30,6 +30,7 @@ const (
 	categoryImage = "extra_data->>'arweaveVideoSrc' IS NULL AND extra_data->>'arweaveAudioSrc' IS NULL AND"
 	categoryVideo = "extra_data->>'arweaveVideoSrc' != '' AND"
 	categoryAudio = "extra_data->>'arweaveAudioSrc' != '' AND"
+	category3D = "extra_data->>'arweaveModelSrc' != '' AND"
 	categoryFreshDrops = ""
 	categoryCommunityFavourites = "true"
 )
@@ -2150,6 +2151,8 @@ func (fes *APIServer) GetNFTsByCategory(ww http.ResponseWriter, req *http.Reques
 			categoryString = categoryVideo
 		case "audio":
 			categoryString = categoryAudio
+		case "3d":
+			categoryString = category3D
 		default:
 			_AddBadRequestError(ww, "GetNFTsByCategory: Error invalid category type")
 			return
