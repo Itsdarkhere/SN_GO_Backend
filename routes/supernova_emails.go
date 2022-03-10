@@ -408,7 +408,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 18,
+		TemplateId: 13,
 		Params: &params,
 	}
 
