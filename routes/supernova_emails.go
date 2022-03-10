@@ -360,11 +360,8 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Failed to send email: %v", err))
 		return
 	}
-	// Return a Success response
-	res := EmailSuccessResponse{
-		Success: true,
-	}
-	if err = json.NewEncoder(ww).Encode(res); err != nil {
+
+	if err = json.NewEncoder(ww).Encode(body); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Problem encoding response as JSON: %v", err))
 		return
 	}
@@ -733,11 +730,7 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Failed to send email: %v", err))
 		return
 	}
-	// Return a Success response
-	res := EmailSuccessResponse{
-		Success: true,
-	}
-	if err = json.NewEncoder(ww).Encode(res); err != nil {
+	if err = json.NewEncoder(ww).Encode(body); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Problem encoding response as JSON: %v", err))
 		return
 	}
