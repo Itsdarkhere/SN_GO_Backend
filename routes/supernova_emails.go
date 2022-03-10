@@ -71,25 +71,21 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 8,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendVerifyEmailEmail: Failed to send email: %v", err))
 		return
@@ -155,25 +151,21 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 15,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendLostNFTEmail: Failed to send email: %v", err))
 		return
@@ -253,25 +245,21 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 4,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.CreatorUsername)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendNewBidEmail: Failed to send email: %v", err))
 		return
@@ -337,25 +325,21 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 12,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 13)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendInactiveUserEmail: Failed to send email: %v", err))
 		return
@@ -418,25 +402,21 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 13,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendWelcomeEmail: Failed to send email: %v", err))
 		return
@@ -517,25 +497,21 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 23,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.OutBiddedUsername)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 15)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
@@ -616,25 +592,21 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 24,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.WinnerUsername)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 10)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidAgainEmail: Failed to send email: %v", err))
 		return
@@ -707,25 +679,21 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
     }
 
 	// Make struct
-	body := sendinblue.SendEmail{
-		EmailTo:       []string{},
-		EmailBcc:      []string{},
-		EmailCc:       []string{},
-		ReplyTo:       "",
-		AttachmentUrl: "",
-		Attachment:    []sendinblue.SendEmailAttachment{},
-		Headers:       nil,
-		Attributes:    nil,
-		Tags:          []string{},
+	body := sendinblue.SendSmtpEmail{
+		Sender: &sendinblue.SendSmtpEmailSender{
+			Name: "Supernovas",
+			Email: "mikaela@supernovas.app",
+		},
+		To: []sendinblue.SendSmtpEmailTo{},
+		TemplateId: 11,
+		Params: &params,
 	}
 
-	// Set Person who to send the email to
-	body.EmailTo = []string{requestData.Email}
 	// Set the map into attributes
-	body.Attributes = &params
+	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
 
 	// Send the email template
-	_, _, err := sib.TransactionalEmailsApi.SendTemplate(ctx, body, 13)
+	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("SendBidPlaceEmail: Failed to send email: %v", err))
 		return
