@@ -1519,6 +1519,7 @@ type GetPGProfileDetailsResponse struct {
     Name string `db:"name"`
 	Creator bool `db:"creator"`
 	Collector bool `db:"collector"`
+	ETHPublicKey string `db:"eth_pk"`
 }
 func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -1550,7 +1551,7 @@ func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Requ
 	// Release connection once function returns
 	defer conn.Release();
 
-	queryString := fmt.Sprintf(`SELECT twitter, website, discord, instagram, name, creator, collector
+	queryString := fmt.Sprintf(`SELECT twitter, website, discord, instagram, name, creator, collector, eth_pk
 	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
 
 	profileDetails := new(GetPGProfileDetailsResponse)
@@ -1564,7 +1565,7 @@ func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Requ
 
 		for rows.Next() {
 			rows.Scan(&profileDetails.Twitter, &profileDetails.Website, &profileDetails.Discord, &profileDetails.Instagram,
-			&profileDetails.Name, &profileDetails.Creator, &profileDetails.Collector)
+			&profileDetails.Name, &profileDetails.Creator, &profileDetails.Collector, &profileDetails.ETHPublicKey)
 			if rows.Err() != nil {
 				_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error in scan: %v", err))
 				return
