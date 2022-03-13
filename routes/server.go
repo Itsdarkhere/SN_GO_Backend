@@ -260,6 +260,7 @@ const (
 	RoutePathGetPGProfileDetails = "/api/v0/get-pg-profile-details"
 	RoutePathUpdateCollectorOrCreator = "/api/v0/update-collector-or-creator"
 	RoutePathGetCollectorOrCreator = "/api/v0/get-collector-or-creator"
+	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -828,6 +829,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathUpdateCollectorOrCreator,
 			fes.UpdateCollectorOrCreator,
+			PublicAccess,
+		},
+		{
+			"InsertOrUpdateIMXPK",
+			[]string{"POST", "OPTIONS"},
+			RoutePathInsertOrUpdateIMXPK,
+			fes.InsertOrUpdateIMXPK,
 			PublicAccess,
 		},
 		{

@@ -1377,6 +1377,69 @@ func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *
 	// Just to make sure call it here too, calling it multiple times has no side-effects
 	conn.Release();
 }
+type InsertOrUpdateIMXPKRequest struct {
+	PublicKeyBase58Check string 
+	ETH_PublicKey string
+}
+func (fes *APIServer) InsertOrUpdateIMXPK(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertOrUpdateIMXPKRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	if requestData.ETH_PublicKey == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_profile_details (public_key, eth_pk) 
+		VALUES ('%v', '%v')
+		ON CONFLICT (public_key) DO UPDATE 
+		SET eth_pk = excluded.eth_pk;`, requestData.PublicKeyBase58Check, requestData.ETH_PublicKey)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
 type UpdateCollectorOrCreatorRequest struct {
 	PublicKeyBase58Check string 
 	Creator bool 
