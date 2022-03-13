@@ -535,7 +535,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 		return
 	}
 	// Confirm we have all needed fields
-	if requestData.Token_id == "" {
+	if requestData.Token_id == 0 {
 		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No Token_id sent in request"))
 		return
 	}
@@ -561,8 +561,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 	// Release connection once function returns
 	defer conn.Release();
 
-	id := 0
-	err = conn.Exec(context.Background(), 
+	_, err = conn.Exec(context.Background(), 
 	fmt.Sprintf("UPDATE pg_eth_metadata SET post_hash = '%v' WHERE token_id = '%v'", requestData.PostHashHex, requestData.Token_id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Update failed: %v", err))
@@ -581,7 +580,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 	// Just to make sure call it here too, calling it multiple times has no side-effects
 	conn.Release();
 }
-type InsertIMXMetadataRequest {
+type InsertIMXMetadataRequest struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
@@ -651,7 +650,7 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	id := 0
 	err = conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
-		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, description, post_hash) 
+		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, category, post_hash) 
 		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata), '%v', '%v') RETURNING token_id`, 
 		name, description, image, image_url, category, postHashHex)).Scan(&id)
 	if err != nil {
