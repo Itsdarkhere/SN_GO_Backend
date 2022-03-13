@@ -1359,7 +1359,7 @@ func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *
 		name = excluded.name;`, requestData.PublicKeyBase58Check, requestData.Twitter, requestData.Website,
 		requestData.Discord, requestData.Instagram, requestData.Name)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Insert failed: %v", err))
 		return
@@ -1424,7 +1424,7 @@ func (fes *APIServer) UpdateCollectorOrCreator(ww http.ResponseWriter, req *http
 		collector = excluded.collector;`, 
 		requestData.PublicKeyBase58Check, requestData.Creator, requestData.Collector)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Insert failed: %v", err))
 		return
@@ -1584,7 +1584,7 @@ type InsertIntoPGVerifiedRequest struct {
 }
 func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	requestData := InsertIntoVerifiedRequest{}
+	requestData := InsertIntoPGVerifiedRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error parsing request body: %v", err))
 		return
@@ -1615,7 +1615,7 @@ func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Req
 	SELECT username, public_key FROM pg_profiles
 	WHERE username ILIKE '%v'`, requestData.Username)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Insert failed: %v", err))
 		return
