@@ -1320,7 +1320,7 @@ type InsertOrUpdateProfileDetailsRequest struct {
 }
 func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	requestData := InsertIntoVerifiedRequest{}
+	requestData := InsertOrUpdateProfileDetailsRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Error parsing request body: %v", err))
 		return
@@ -1376,6 +1376,78 @@ func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *
 	}
 	// Just to make sure call it here too, calling it multiple times has no side-effects
 	conn.Release();
+}
+type GetPGProfileDetailsRequest struct {
+	PublicKeyBase58Check string
+}
+type GetPGProfileDetailsResponse struct {
+	Twitter string `db:"twitter"`
+    Website string `db:"website"`
+    Discord string `db:"discord"`
+    Instagram string `db:"instagram"`
+    Name string `db:"name"`
+	Creator bool `db:"creator"`
+	Collector bool `db:"collector"`
+}
+func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetPGProfileDetailsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`SELECT twitter, website, discord, instagram, name, creator, collector
+	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
+
+	profileDetails := new(GetPGProfileDetailsResponse)
+
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error in query: %v", err))
+		return
+	} else {
+		defer rows.Close()
+
+		for rows.Next() {
+			rows.Scan(&profileDetails.Twitter, &profileDetails.Website, &profileDetails.Discord, &profileDetails.Instagram,
+			&profileDetails.Name, &profileDetails.Creator, &profileDetails.Collector)
+			if rows.Err() != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error in scan: %v", err))
+				return
+			}
+		}
+		// Serialize response to JSON
+		if err = json.NewEncoder(ww).Encode(profileDetails); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetPGProfileDetails: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}	
+
 }
 type InsertIntoPGVerifiedRequest struct {
 	Username string
