@@ -1395,7 +1395,7 @@ func (fes *APIServer) UpdateCollectorOrCreator(ww http.ResponseWriter, req *http
 		return
 	}
 
-	if !requestData.Creator || !requestData.Collector {
+	if requestData.Creator == false && requestData.Collector == false {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Must choose creator or collector"))
 		return
 	}
