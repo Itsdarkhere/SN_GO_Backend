@@ -1480,7 +1480,7 @@ func (fes *APIServer) GetCollectorOrCreator(ww http.ResponseWriter, req *http.Re
 	// Release connection once function returns
 	defer conn.Release();
 
-	queryString := fmt.Sprintf(`SELECT creator, collector
+	queryString := fmt.Sprintf(`SELECT COALESCE(creator, false), COALESCE(collector, false)
 	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
 
 	collectorAndCreator := new(GetCollectorOrCreatorResponse)
@@ -1551,7 +1551,9 @@ func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Requ
 	// Release connection once function returns
 	defer conn.Release();
 
-	queryString := fmt.Sprintf(`SELECT twitter, website, discord, instagram, name, creator, collector, eth_pk
+	queryString := fmt.Sprintf(`SELECT COALESCE(twitter, ''), COALESCE(website, ''), 
+	COALESCE(discord, ''), COALESCE(instagram, ''), COALESCE(name, ''), 
+	COALESCE(creator, false), COALESCE(collector, false), COALESCE(eth_pk, '')
 	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
 
 	profileDetails := new(GetPGProfileDetailsResponse)
