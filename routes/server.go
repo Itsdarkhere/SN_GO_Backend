@@ -254,6 +254,8 @@ const (
 	RoutePathGetIMXMetadataById = "/api/v0/imx/metadata"
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
 	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
+	// PG verified list
+	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -794,6 +796,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathUpdateIMXMetadataPostHash,
 			fes.UpdateIMXMetadataPostHash,
+			PublicAccess,
+		},
+		{
+			"InsertIntoPGVerified",
+			[]string{"POST", "OPTIONS"},
+			RoutePathInsertIntoPGVerified,
+			fes.InsertIntoPGVerified,
 			PublicAccess,
 		},
 		{

@@ -1310,7 +1310,61 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	connection.Release();
 
 }
+type InsertIntoPGVerifiedRequest struct {
+	Username string
+}
+func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertIntoVerifiedRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error parsing request body: %v", err))
+		return
+	}
 
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error no username sent in request"))
+		return
+	}
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_verified(username, public_key)
+	SELECT username, public_key FROM pg_profiles
+	WHERE username ILIKE '%v'`, requestData.Username)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoPGVerified: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	Offset int64 `safeForLogging:"true"`
