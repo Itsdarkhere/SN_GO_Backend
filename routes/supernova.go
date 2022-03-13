@@ -1443,6 +1443,71 @@ func (fes *APIServer) UpdateCollectorOrCreator(ww http.ResponseWriter, req *http
 	conn.Release();
 
 }
+type GetCollectorOrCreatorRequest struct {
+	PublicKeyBase58Check string 
+}
+type GetCollectorOrCreatorResponse struct {
+	Creator bool `db:"creator"`
+	Collector bool `db:"collector"`
+}
+func (fes *APIServer) GetCollectorOrCreator(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetCollectorOrCreatorRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`SELECT creator, collector
+	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
+
+	collectorAndCreator := new(GetCollectorOrCreatorResponse)
+
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error in query: %v", err))
+		return
+	} else {
+		defer rows.Close()
+
+		for rows.Next() {
+			rows.Scan(&collectorAndCreator.Creator, &collectorAndCreator.Collector)
+			if rows.Err() != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error in scan: %v", err))
+				return
+			}
+		}
+		// Serialize response to JSON
+		if err = json.NewEncoder(ww).Encode(collectorAndCreator); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetCollectorOrCreator: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}	
+}
 type GetPGProfileDetailsRequest struct {
 	PublicKeyBase58Check string
 }
@@ -1513,7 +1578,6 @@ func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Requ
 		// Just to make sure call it here too, calling it multiple times has no side-effects
 		conn.Release();
 	}	
-
 }
 type InsertIntoPGVerifiedRequest struct {
 	Username string
