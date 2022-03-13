@@ -1310,7 +1310,330 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	connection.Release();
 
 }
+type InsertOrUpdateProfileDetailsRequest struct {
+	PublicKeyBase58Check string
+	Twitter string
+    Website string
+    Discord string
+    Instagram string
+    Name string
+}
+func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertOrUpdateProfileDetailsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Error parsing request body: %v", err))
+		return
+	}
 
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_profile_details (public_key, twitter, website, discord, 
+		instagram, name) 
+		VALUES ('%v', NULLIF('%v', ''), NULLIF('%v', ''), NULLIF('%v', ''), NULLIF('%v', ''), NULLIF('%v', ''))
+		ON CONFLICT (public_key) DO UPDATE 
+		SET twitter = excluded.twitter,
+		website = excluded.website,
+		discord = excluded.discord,
+		instagram = excluded.instagram,
+		name = excluded.name;`, requestData.PublicKeyBase58Check, requestData.Twitter, requestData.Website,
+		requestData.Discord, requestData.Instagram, requestData.Name)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+}
+type UpdateCollectorOrCreatorRequest struct {
+	PublicKeyBase58Check string 
+	Creator bool 
+	Collector bool 
+}
+func (fes *APIServer) UpdateCollectorOrCreator(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := UpdateCollectorOrCreatorRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	if !requestData.Creator || !requestData.Collector {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Must choose creator or collector"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_profile_details (public_key, creator, collector) 
+		VALUES ('%v', %v, %v)
+		ON CONFLICT (public_key) DO UPDATE 
+		SET creator = excluded.creator,
+		collector = excluded.collector;`, 
+		requestData.PublicKeyBase58Check, requestData.Creator, requestData.Collector)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
+type GetCollectorOrCreatorRequest struct {
+	PublicKeyBase58Check string 
+}
+type GetCollectorOrCreatorResponse struct {
+	Creator bool `db:"creator"`
+	Collector bool `db:"collector"`
+}
+func (fes *APIServer) GetCollectorOrCreator(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetCollectorOrCreatorRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`SELECT creator, collector
+	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
+
+	collectorAndCreator := new(GetCollectorOrCreatorResponse)
+
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error in query: %v", err))
+		return
+	} else {
+		defer rows.Close()
+
+		for rows.Next() {
+			rows.Scan(&collectorAndCreator.Creator, &collectorAndCreator.Collector)
+			if rows.Err() != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetCollectorOrCreator: Error in scan: %v", err))
+				return
+			}
+		}
+		// Serialize response to JSON
+		if err = json.NewEncoder(ww).Encode(collectorAndCreator); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetCollectorOrCreator: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}	
+}
+type GetPGProfileDetailsRequest struct {
+	PublicKeyBase58Check string
+}
+type GetPGProfileDetailsResponse struct {
+	Twitter string `db:"twitter"`
+    Website string `db:"website"`
+    Discord string `db:"discord"`
+    Instagram string `db:"instagram"`
+    Name string `db:"name"`
+	Creator bool `db:"creator"`
+	Collector bool `db:"collector"`
+}
+func (fes *APIServer) GetPGProfileDetails(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetPGProfileDetailsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.PublicKeyBase58Check == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error no PublicKeyBase58Check sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`SELECT twitter, website, discord, instagram, name, creator, collector
+	FROM pg_profile_details WHERE public_key = '%v'`, requestData.PublicKeyBase58Check)
+
+	profileDetails := new(GetPGProfileDetailsResponse)
+
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error in query: %v", err))
+		return
+	} else {
+		defer rows.Close()
+
+		for rows.Next() {
+			rows.Scan(&profileDetails.Twitter, &profileDetails.Website, &profileDetails.Discord, &profileDetails.Instagram,
+			&profileDetails.Name, &profileDetails.Creator, &profileDetails.Collector)
+			if rows.Err() != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetPGProfileDetails: Error in scan: %v", err))
+				return
+			}
+		}
+		// Serialize response to JSON
+		if err = json.NewEncoder(ww).Encode(profileDetails); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetPGProfileDetails: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}	
+}
+type InsertIntoPGVerifiedRequest struct {
+	Username string
+}
+func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := InsertIntoVerifiedRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.Username == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error no username sent in request"))
+		return
+	}
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_verified(username, public_key)
+	SELECT username, public_key FROM pg_profiles
+	WHERE username ILIKE '%v'`, requestData.Username)
+
+	err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Insert failed: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("InsertIntoPGVerified: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
 type SortMarketplaceRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	Offset int64 `safeForLogging:"true"`
