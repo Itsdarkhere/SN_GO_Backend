@@ -1421,7 +1421,7 @@ func (fes *APIServer) InsertOrUpdateIMXPK(ww http.ResponseWriter, req *http.Requ
 		ON CONFLICT (public_key) DO UPDATE 
 		SET eth_pk = excluded.eth_pk;`, requestData.PublicKeyBase58Check, requestData.ETH_PublicKey)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Insert failed: %v", err))
 		return
