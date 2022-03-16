@@ -3273,7 +3273,7 @@ func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Req
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select * from analytics.deso_nft_sales_cap ORDER BY rollup_timestamp desc LIMIT 30;`
+	queryString := `select * from analytics.deso_nft_sales_volume ORDER BY rollup_timestamp desc LIMIT 30;`
 
 	// Store response in this
 	graphResponse := []*DesoSalesCapGraphItem
