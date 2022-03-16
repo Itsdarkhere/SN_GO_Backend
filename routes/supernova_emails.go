@@ -82,7 +82,7 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -162,7 +162,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -256,7 +256,7 @@ func (fes *APIServer) SendNewBidEmail(ww http.ResponseWriter, req *http.Request)
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.CreatorUsername)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.CreatorUsername})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -336,7 +336,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -413,7 +413,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -508,7 +508,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.OutBiddedUsername)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.OutBiddedUsername})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -603,7 +603,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.WinnerUsername)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.WinnerUsername})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)
@@ -690,7 +690,7 @@ func (fes *APIServer) SendBidPlacedEmail(ww http.ResponseWriter, req *http.Reque
 	}
 
 	// Set the map into attributes
-	b.To = append(b.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username)
+	body.To = append(body.To, sendinblue.SendSmtpEmailTo{requestData.Email, requestData.Username})
 
 	// Send the email template
 	_, _, err := sib.TransactionalEmailsApi.SendTransacEmail(ctx, body)

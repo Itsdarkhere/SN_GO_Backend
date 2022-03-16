@@ -211,9 +211,9 @@ func (fes *APIServer) InsertIntoCollection(ww http.ResponseWriter, req *http.Req
 	FROM pg_sn_collections
 	WHERE creator_name = '%v' AND collection = '%v'
 	LIMIT 1;
-	` requestData.PostHashHex, requestData.Username, requestData.Collection)
+	`, requestData.PostHashHex, requestData.Username, requestData.Collection)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoCollection: Insert failed: %v", err))
 		return
@@ -269,7 +269,7 @@ func (fes *APIServer) GetAllUserCollectionNames(ww http.ResponseWriter, req *htt
 	`, requestData.Username)
 
 	// Store response in this
-	userCollectionNames := []*string
+	var userCollectionNames []string
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -310,12 +310,13 @@ type GetAllUserCollectionsRequest struct {
 	Username string
 }
 type GetAllUserCollectionsResponse struct {
-	CollectionName string
-	CollectionDescription string
-	CollectionBannerLocation string
-	CollectionProfilePicLocation string
-	FloorPrice int64
-	Pieces int
+	Collection string `db:"collection"`
+	CollectionCreatorName string `db:"creator_name"`
+	CollectionDescription string `db:"collection_description"`
+	CollectionBannerLocation string `db:"banner_location"`
+	CollectionProfilePicLocation string `db:"pp_location"`
+	FloorPrice int64 `db:"floor_price"`
+	Pieces int `db:"pieces"`
 }
 func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -365,7 +366,7 @@ func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Re
 	FROM pg_sn_collections AS c WHERE creator_name = '%v'`, requestData.Username)
 
 	// Store response in this
-	userCollectionResponses []*GetAllUserCollectionsResponse
+	var userCollectionResponses []*GetAllUserCollectionsResponse
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -430,8 +431,8 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	collectionName := requestData.collectionName
-	collectionCreatorName := requestData.collectionCreatorName
+	collectionName := requestData.CollectionName
+	collectionCreatorName := requestData.CollectionCreatorName
 
 	// Get connection pool
 	dbPool, err := CustomConnect()
@@ -534,7 +535,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 		return
 	}
 	// Confirm we have all needed fields
-	if requestData.Token_id == "" {
+	if requestData.Token_id == 0 {
 		_AddInternalServerError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: No Token_id sent in request"))
 		return
 	}
@@ -560,8 +561,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 	// Release connection once function returns
 	defer conn.Release();
 
-	id := 0
-	err = conn.Exec(context.Background(), 
+	_, err = conn.Exec(context.Background(), 
 	fmt.Sprintf("UPDATE pg_eth_metadata SET post_hash = '%v' WHERE token_id = '%v'", requestData.PostHashHex, requestData.Token_id))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateIMXMetadataPostHash: Update failed: %v", err))
@@ -580,7 +580,7 @@ func (fes *APIServer) UpdateIMXMetadataPostHash(ww http.ResponseWriter, req *htt
 	// Just to make sure call it here too, calling it multiple times has no side-effects
 	conn.Release();
 }
-type InsertIMXMetadataRequest {
+type InsertIMXMetadataRequest struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
 	Image string `db:"image"`
@@ -650,9 +650,9 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	id := 0
 	err = conn.QueryRow(context.Background(), 
 	fmt.Sprintf(
-		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, description, post_hash) 
+		`INSERT INTO pg_eth_metadata (name, description, image, image_url, token_id, category, post_hash) 
 		VALUES ('%v', '%v', '%v', '%v', (SELECT MAX(token_id) + 1 FROM pg_eth_metadata), '%v', '%v') RETURNING token_id`, 
-		name, description, image, image_url, description, postHashHex)).Scan(&id)
+		name, description, image, image_url, category, postHashHex)).Scan(&id)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIMXMetadata: Insert failed: %v", err))
 		return
@@ -1359,7 +1359,7 @@ func (fes *APIServer) InsertOrUpdateProfileDetails(ww http.ResponseWriter, req *
 		name = excluded.name;`, requestData.PublicKeyBase58Check, requestData.Twitter, requestData.Website,
 		requestData.Discord, requestData.Instagram, requestData.Name)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateProfileDetails: Insert failed: %v", err))
 		return
@@ -1487,7 +1487,7 @@ func (fes *APIServer) UpdateCollectorOrCreator(ww http.ResponseWriter, req *http
 		collector = excluded.collector;`, 
 		requestData.PublicKeyBase58Check, requestData.Creator, requestData.Collector)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("UpdateCollectorOrCreator: Insert failed: %v", err))
 		return
@@ -1650,7 +1650,7 @@ type InsertIntoPGVerifiedRequest struct {
 }
 func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
-	requestData := InsertIntoVerifiedRequest{}
+	requestData := InsertIntoPGVerifiedRequest{}
 	if err := decoder.Decode(&requestData); err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Error parsing request body: %v", err))
 		return
@@ -1681,7 +1681,7 @@ func (fes *APIServer) InsertIntoPGVerified(ww http.ResponseWriter, req *http.Req
 	SELECT username, public_key FROM pg_profiles
 	WHERE username ILIKE '%v'`, requestData.Username)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertIntoPGVerified: Insert failed: %v", err))
 		return
