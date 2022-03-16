@@ -255,6 +255,12 @@ const (
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
 	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
 	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
+	// SUPERNOVAS ANALYTICS
+	RoutePathGetUniqueCreators = "/api/v0/get-unique-creators"
+	RoutePathGetUniqueCollectors = "/api/v0/get-unique-collectors"
+	RoutePathGetDesoSalesCapGraph = "/api/v0/get-deso-sales-cap-graph"
+	RoutePathGetDesoMarketCapGraph = "/api/v0/get-deso-market-cap-graph"
+
 	// PG verified list
 	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
 	RoutePathInsertOrUpdateProfileDetails = "/api/v0/insert-or-update-profile-details"
@@ -838,11 +844,40 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			fes.InsertOrUpdateIMXPK,
 			PublicAccess,
 		},
+		// Analytics
 		{
-			"GetCollectorOrCreator",
+			"InsertOrUpdateIMXPK",
 			[]string{"POST", "OPTIONS"},
-			RoutePathGetCollectorOrCreator,
-			fes.GetCollectorOrCreator,
+			RoutePathInsertOrUpdateIMXPK,
+			fes.InsertOrUpdateIMXPK,
+			PublicAccess,
+		},
+		{
+			"GetUniqueCreators",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetUniqueCreators,
+			fes.GetUniqueCreators,
+			PublicAccess,
+		},
+		{
+			"GetUniqueCollectors",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetUniqueCollectors,
+			fes.GetUniqueCollectors,
+			PublicAccess,
+		},
+		{
+			"GetDesoSalesCapGraph",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetDesoSalesCapGraph,
+			fes.GetDesoSalesCapGraph,
+			PublicAccess,
+		},
+		{
+			"GetDesoMarketCapGraph",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetDesoMarketCapGraph,
+			fes.GetDesoMarketCapGraph,
 			PublicAccess,
 		},
 		{

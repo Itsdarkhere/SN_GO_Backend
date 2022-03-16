@@ -3159,3 +3159,316 @@ func (fes *APIServer) AddToMarketplace(ww http.ResponseWriter, req *http.Request
 		return
 	}
 }
+// ANALYTICS ROUTES
+type GetDesoMarketCapGraphResponse struct {
+	Response []*DesoMarketCapGraphItem
+}
+type DesoMarketCapGraphItem struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	WeeklyCap int64 `db:"last_accepted_bid_amount_nanos"`
+}
+type BasicAnalyticsRequest struct {
+	PublicKeyBase58Check string
+}
+func (fes *APIServer) GetDesoMarketCapGraph(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select * from analytics.deso_nft_market_cap ORDER BY rollup_timestamp desc LIMIT 30;`
+
+	// Store response in this
+	graphResponse := []*DesoMarketCapGraphItem
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual collection name
+		graphItem := new(DesoMarketCapGraphItem)
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&graphItem.Timestamp, &graphItem.WeeklyCap)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			graphResponse = append(graphResponse, graphItem)
+        }
+
+		resp := GetDesoMarketCapGraphResponse { 
+			Response: graphResponse,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetDesoMarketCapGraph: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetDesoSalesCapGraphResponse struct {
+	Response []*DesoSalesCapGraphItem
+}
+type DesoSalesCapGraphItem struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	WeeklyCap int64 `db:"bid_amount_nanos"`
+}
+func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select * from analytics.deso_nft_sales_cap ORDER BY rollup_timestamp desc LIMIT 30;`
+
+	// Store response in this
+	graphResponse := []*DesoSalesCapGraphItem
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual collection name
+		graphItem := new(DesoSalesCapGraphItem)
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&graphItem.Timestamp, &graphItem.WeeklyCap)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			graphResponse = append(graphResponse, graphItem)
+        }
+
+		resp := GetDesoSalesCapGraphResponse { 
+			Response: graphResponse,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetDesoSalesCapGraph: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetUniqueCollectorsResponse struct {
+	Response []*UniqueCollectorsItem
+}
+type UniqueCollectorsItem struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	CollectorsAmount int64 `db:"collectors_count"`
+}
+func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCollectors: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCollectors: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCollectors: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select * from analytics.unique_collectors ORDER BY rollup_timestamp desc LIMIT 30;`
+
+	// Store response in this
+	graphResponse := []*UniqueCollectorsItem
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCollectors: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual collection name
+		graphItem := new(UniqueCollectorsItem)
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&graphItem.Timestamp, &graphItem.CollectorsAmount)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCollectors: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			graphResponse = append(graphResponse, graphItem)
+        }
+
+		resp := GetUniqueCollectorsResponse { 
+			Response: graphResponse,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetUniqueCollectors: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetUniqueCreatorsResponse struct {
+	Response []*UniqueCollectorsItem
+}
+type UniqueCreatorsItem struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	CreatorsAmount int64 `db:"creators_count"`
+}
+func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCreators: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCreators: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCreators: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select * from analytics.unique_creators ORDER BY rollup_timestamp desc LIMIT 30;`
+
+	// Store response in this
+	graphResponse := []*UniqueCreatorsItem
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCreators: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		// Store individual collection name
+		graphItem := new(UniqueCreatorsItem)
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			rows.Scan(&graphItem.Timestamp, &graphItem.CollectorsAmount)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetUniqueCreators: Error scanning to struct: %v", err))
+				return
+			}
+			// Append to array being returned
+			graphResponse = append(graphResponse, graphItem)
+        }
+
+		resp := GetUniqueCreatorsResponse { 
+			Response: graphResponse,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetUniqueCreators: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+
+}
