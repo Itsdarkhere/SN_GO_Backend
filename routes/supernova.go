@@ -3199,7 +3199,7 @@ func (fes *APIServer) GetDesoMarketCapGraph(ww http.ResponseWriter, req *http.Re
 	queryString := `select * from analytics.deso_nft_market_cap ORDER BY rollup_timestamp desc LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*DesoMarketCapGraphItem
+	var graphResponse []*DesoMarketCapGraphItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -3276,7 +3276,7 @@ func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Req
 	queryString := `select * from analytics.deso_nft_sales_cap ORDER BY rollup_timestamp desc LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*DesoSalesCapGraphItem
+	var graphResponse []*DesoSalesCapGraphItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -3353,7 +3353,7 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 	queryString := `select * from analytics.unique_collectors ORDER BY rollup_timestamp desc LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*UniqueCollectorsItem
+	var graphResponse []*UniqueCollectorsItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -3395,7 +3395,7 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 	}
 }
 type GetUniqueCreatorsResponse struct {
-	Response []*UniqueCollectorsItem
+	Response []*UniqueCreatorsItem
 }
 type UniqueCreatorsItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
@@ -3430,7 +3430,7 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 	queryString := `select * from analytics.unique_creators ORDER BY rollup_timestamp desc LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*UniqueCreatorsItem
+	var graphResponse []*UniqueCreatorsItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -3447,7 +3447,7 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 		
         // Next prepares the next row for reading.
         for rows.Next() {
-			rows.Scan(&graphItem.Timestamp, &graphItem.CollectorsAmount)
+			rows.Scan(&graphItem.Timestamp, &graphItem.CreatorsAmount)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
