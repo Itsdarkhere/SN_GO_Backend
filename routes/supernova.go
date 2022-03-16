@@ -3210,12 +3210,12 @@ func (fes *APIServer) GetDesoMarketCapGraph(ww http.ResponseWriter, req *http.Re
 
 		// Defer closing rows
 		defer rows.Close()
-
-		// Store individual collection name
-		graphItem := new(DesoMarketCapGraphItem)
 		
         // Next prepares the next row for reading.
         for rows.Next() {
+			// Store individual collection name
+			graphItem := new(DesoMarketCapGraphItem)
+
 			rows.Scan(&graphItem.Timestamp, &graphItem.WeeklyCap)
 			// Check for errors
 			if rows.Err() != nil {
@@ -3287,12 +3287,12 @@ func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Req
 
 		// Defer closing rows
 		defer rows.Close()
-
-		// Store individual collection name
-		graphItem := new(DesoSalesCapGraphItem)
 		
         // Next prepares the next row for reading.
         for rows.Next() {
+			// Store individual collection name
+			graphItem := new(DesoSalesCapGraphItem)
+
 			rows.Scan(&graphItem.Timestamp, &graphItem.WeeklyCap)
 			// Check for errors
 			if rows.Err() != nil {
@@ -3364,12 +3364,12 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 
 		// Defer closing rows
 		defer rows.Close()
-
-		// Store individual collection name
-		graphItem := new(UniqueCollectorsItem)
 		
         // Next prepares the next row for reading.
         for rows.Next() {
+			// Store individual collection name
+			graphItem := new(UniqueCollectorsItem)
+
 			rows.Scan(&graphItem.Timestamp, &graphItem.CollectorsAmount)
 			// Check for errors
 			if rows.Err() != nil {
@@ -3441,12 +3441,12 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 
 		// Defer closing rows
 		defer rows.Close()
-
-		// Store individual collection name
-		graphItem := new(UniqueCreatorsItem)
 		
         // Next prepares the next row for reading.
         for rows.Next() {
+			// Store individual collection name
+			graphItem := new(UniqueCreatorsItem)
+
 			rows.Scan(&graphItem.Timestamp, &graphItem.CreatorsAmount)
 			// Check for errors
 			if rows.Err() != nil {
