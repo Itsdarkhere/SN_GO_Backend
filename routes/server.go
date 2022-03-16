@@ -254,13 +254,13 @@ const (
 	RoutePathGetIMXMetadataById = "/api/v0/imx/metadata"
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
 	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
+	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
 	// PG verified list
 	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
 	RoutePathInsertOrUpdateProfileDetails = "/api/v0/insert-or-update-profile-details"
 	RoutePathGetPGProfileDetails = "/api/v0/get-pg-profile-details"
 	RoutePathUpdateCollectorOrCreator = "/api/v0/update-collector-or-creator"
 	RoutePathGetCollectorOrCreator = "/api/v0/get-collector-or-creator"
-	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
