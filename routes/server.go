@@ -838,6 +838,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			PublicAccess,
 		},
 		{
+			"GetCollectorOrCreator",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetCollectorOrCreator,
+			fes.GetCollectorOrCreator,
+			PublicAccess,
+		},
+		{
 			"InsertOrUpdateIMXPK",
 			[]string{"POST", "OPTIONS"},
 			RoutePathInsertOrUpdateIMXPK,
