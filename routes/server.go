@@ -255,6 +255,7 @@ const (
 	RoutePathInsertIMXMetadata = "/api/v0/insert/imx"
 	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
 	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
+	RoutePathGetDesoPKbyETHPK = "/api/v0/get-deso-pk-by-ethpk"
 	// SUPERNOVAS ANALYTICS
 	RoutePathGetUniqueCreators = "/api/v0/get-unique-creators"
 	RoutePathGetUniqueCollectors = "/api/v0/get-unique-collectors"
@@ -827,6 +828,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathInsertOrUpdateProfileDetails,
 			fes.InsertOrUpdateProfileDetails,
+			PublicAccess,
+		},
+		{
+			"GetDesoPKbyETHPK",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetDesoPKbyETHPK,
+			fes.GetDesoPKbyETHPK,
 			PublicAccess,
 		},
 		{
