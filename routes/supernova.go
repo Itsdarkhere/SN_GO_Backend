@@ -3220,7 +3220,7 @@ type GetDesoMarketCapGraphResponse struct {
 }
 type DesoMarketCapGraphItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
-	WeeklyCap int64 `db:"last_accepted_bid_amount_nanos"`
+	WeeklyCap int64 `db:"market_cap"`
 }
 type BasicAnalyticsRequest struct {
 	PublicKeyBase58Check string
@@ -3251,7 +3251,11 @@ func (fes *APIServer) GetDesoMarketCapGraph(ww http.ResponseWriter, req *http.Re
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select * from analytics.deso_nft_market_cap ORDER BY rollup_timestamp desc LIMIT 30;`
+	queryString := `SELECT rollup_timestamp,
+	SUM(last_accepted_bid_amount_nanos) OVER(ORDER BY rollup_timestamp) as market_cap                              
+	FROM analytics.deso_nft_market_cap
+	ORDER BY rollup_timestamp desc
+	LIMIT 30;`
 
 	// Store response in this
 	graphResponse := []*DesoMarketCapGraphItem
@@ -3300,7 +3304,7 @@ type GetDesoSalesCapGraphResponse struct {
 }
 type DesoSalesCapGraphItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
-	WeeklyCap int64 `db:"bid_amount_nanos"`
+	WeeklyCap int64 `db:"sales_cap"`
 }
 func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -3328,7 +3332,11 @@ func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Req
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select * from analytics.deso_nft_sales_volume ORDER BY rollup_timestamp desc LIMIT 30;`
+	queryString := `SELECT rollup_timestamp,
+	SUM(bid_amount_nanos) OVER(ORDER BY rollup_timestamp) as sales_cap                              
+	FROM analytics.deso_nft_sales_volume
+	ORDER BY rollup_timestamp desc
+	LIMIT 30;`
 
 	// Store response in this
 	graphResponse := []*DesoSalesCapGraphItem
@@ -3377,7 +3385,7 @@ type GetUniqueCollectorsResponse struct {
 }
 type UniqueCollectorsItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
-	CollectorsAmount int64 `db:"collectors_count"`
+	CollectorsAmount int64 `db:"unique_collectors"`
 }
 func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -3405,7 +3413,12 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select * from analytics.unique_collectors ORDER BY rollup_timestamp desc LIMIT 30;`
+	queryString := `SELECT rollup_timestamp,
+	SUM(collectors_count) OVER(ORDER BY rollup_timestamp) as unique_collectors                              
+	FROM analytics.unique_collectors
+	ORDER BY rollup_timestamp desc
+	LIMIT 30;
+	`
 
 	// Store response in this
 	graphResponse := []*UniqueCollectorsItem
@@ -3454,7 +3467,7 @@ type GetUniqueCreatorsResponse struct {
 }
 type UniqueCreatorsItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
-	CreatorsAmount int64 `db:"creators_count"`
+	CreatorsAmount int64 `db:"unique_creators"`
 }
 func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -3482,7 +3495,12 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select * from analytics.unique_creators ORDER BY rollup_timestamp desc LIMIT 30;`
+	queryString := `SELECT rollup_timestamp,
+	SUM(creators_count) OVER(ORDER BY rollup_timestamp) as unique_creators                              
+	FROM analytics.unique_creators
+	ORDER BY rollup_timestamp desc
+	LIMIT 30;
+	`
 
 	// Store response in this
 	graphResponse := []*UniqueCreatorsItem
@@ -3603,6 +3621,7 @@ type TopEarningCreator struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
 	EarningsAmount int64  `db:"sum_bid_amount_nanos"`
 	PublicKeyBase58Check string  `db:"poster_public_key"`
+	Username string `db:"username"`
 }
 func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -3630,8 +3649,10 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select rollup_timestamp, sum_bid_amount_nanos, poster_public_key 
-	from analytics.top_earning_creators ORDER BY rollup_timestamp desc LIMIT 20;`
+	queryString := `select rollup_timestamp, sum_bid_amount_nanos, poster_public_key, username 
+	from analytics.top_earning_creators INNER JOIN pg_profiles 
+	ON pg_profiles.public_key = poster_public_key 
+	ORDER BY rollup_timestamp, sum_bid_amount_nanos desc LIMIT 20;`
 
 	var topEarningArray []*TopEarningCreator
 
@@ -3656,7 +3677,8 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 			rows.Scan(
 				&topEarningCreator.Timestamp, 
 				&topEarningCreator.EarningsAmount, 
-				&pk_bytea.Poster_public_key
+				&pk_bytea.Poster_public_key,
+				&topEarningCreator.Username 
 			)
 			// Check for errors
 			if rows.Err() != nil {
@@ -3696,6 +3718,7 @@ type TopEarningCollector struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
 	EarningsAmount int64  `db:"sum_bid_amount_nanos"`
 	PublicKeyBase58Check string  `db:"bidder_pkid"`
+	Username string `db:"username"`
 }
 func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -3723,8 +3746,10 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 	defer conn.Release();
 
 	// Create the query
-	queryString := `select rollup_timestamp, sum_bid_amount_nanos, bidder_pkid 
-	from analytics.top_nft_investors ORDER BY rollup_timestamp desc LIMIT 20;`
+	queryString := `select rollup_timestamp, sum_bid_amount_nanos, bidder_pkid, username 
+	from analytics.top_nft_investors INNER JOIN pg_profiles 
+	ON public_key = bidder_pkid 
+	ORDER BY rollup_timestamp, sum_bid_amount_nanos desc LIMIT 20;`
 
 	var topEarningArray []*TopEarningCollector
 
@@ -3749,7 +3774,8 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 			rows.Scan(
 				&topEarningCollector.Timestamp, 
 				&topEarningCollector.EarningsAmount, 
-				&pk_bytea.Poster_public_key
+				&pk_bytea.Poster_public_key,
+				&topEarningCollector.Username
 			)
 			// Check for errors
 			if rows.Err() != nil {
