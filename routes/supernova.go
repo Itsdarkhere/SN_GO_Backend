@@ -523,6 +523,61 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		conn.Release();
 	}
 }
+type GetDesoPKbyETHPKRequest struct {
+	ETHPK string 
+}
+type GetDesoPKbyETHPKResponse struct {
+	PublicKeyBase58Check string `db:"public_key"`
+}
+func (fes *APIServer) GetDesoPKbyETHPK(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetDesoPKbyETHPKRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Error parsing request body: %v", err))
+		return
+	}
+	// Confirm we have all needed fields
+	if requestData.ETHPK == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("GetDesoPKbyETHPK: No ETHPK sent in request"))
+		return
+	}
+
+	// Get connection pool, NEW SINCE WE ARE USING ANOTHER DB THAN USUAL
+	dbPool, err := CustomConnectETH()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Unable to connect to pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Unable to get db connection: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Store deso pk here
+	pkResponse := new(GetDesoPKbyETHPKResponse)
+	 
+	queryString := fmt.Sprintf("SELECT public_key from pg_profile_details WHERE eth_pk = '%v' LIMIT 1;", requestData.ETHPK)
+
+	err = conn.conn.QueryRow(context.Background(), queryString).Scan(&pkResponse.PublicKeyBase58Check)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Insert failed: %v", err))
+		return
+	}
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(pkResponse); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Problem serializing object to JSON: %v", err))
+		return
+	}
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+}
 type UpdateIMXMetadataPostHashRequest struct {
 	Token_id int
 	PostHashHex string
@@ -3883,7 +3938,7 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data 
 	FROM analytics.top_nft_sales_on_deso INNER JOIN pg_posts 
-	ON top_nft_sales_on_deso.post_hash = pg_posts.post_hash LIMIT 10;`
+	ON top_nft_sales_on_deso.post_hash = encode(pg_posts.post_hash, 'hex') LIMIT 10;`
 
 
 	// Query
