@@ -2536,7 +2536,7 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 			// Decode the postHash.
 			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
 			if err != nil {
-				_AddBadRequestError(ww, fmt.Sprintf("GetCommunityFavourites: %v", err))
+				_AddBadRequestError(ww, fmt.Sprintf("GetFreshdrops: %v", err))
 				return
 			}
 			// Fetch the postEntry requested.
@@ -3470,5 +3470,525 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 		// Just to make sure call it here too, calling it multiple times has no side-effects
 		conn.Release();
 	}
+}
+type GetQuickFactsResponse struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	TotalNFTsSold int64  `db:"total_nfts_sold"`
+	AverageSalesPrice int64  `db:"average_sales_price"`
+	AverageCreatorRoyalty int64  `db:"avg_creator_royalty_basis_points"`
+	AverageCoinRoyalty int64 `db:"avg_coin_royalty_basis_points"`
+}
+func (fes *APIServer) GetQuickFacts(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetQuickFacts: Error parsing request body: %v", err))
+		return
+	}
 
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetQuickFacts: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetQuickFacts: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select * from analytics.quick_facts ORDER BY rollup_timestamp desc LIMIT 1;`
+
+	// Store individual collection name
+	quickFacts := new(GetQuickFactsResponse)
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetQuickFacts: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+
+			rows.Scan(&quickFacts.Timestamp, &quickFacts.TotalBFTsSold, &quickFacts.AverageSalesPrice,
+				&quickFacts.AverageCreatorRoyalty, &quickFacts.AverageCoinRoyalty)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetQuickFacts: Error scanning to struct: %v", err))
+				return
+			}
+        }
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(quickFacts); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetQuickFacts: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetTopEarningCreatorsResponse struct {
+	Response []*TopEarningCreator
+}
+type TopEarningCreator struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	EarningsAmount int64  `db:"sum_bid_amount_nanos"`
+	PublicKeyBase58Check string  `db:"poster_public_key"`
+}
+func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select rollup_timestamp, sum_bid_amount_nanos, poster_public_key 
+	from analytics.top_earning_creators ORDER BY rollup_timestamp desc LIMIT 20;`
+
+	var topEarningArray []*TopEarningCreator
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+
+			// Store individual collection name
+			topEarningCreator := new(TopEarningCreator)
+			// Need a holder var for the bytea format
+			pk_bytea := new(PPKBytea)
+
+			rows.Scan(
+				&topEarningCreator.Timestamp, 
+				&topEarningCreator.EarningsAmount, 
+				&pk_bytea.Poster_public_key
+			)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error scanning to struct: %v", err))
+				return
+			}
+			// Make bytea into string PublicKey
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(pk_bytea.Poster_public_key).PKID
+			publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+
+			// Put string format public key to struct
+			topEarningCreator.PublicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+
+			// Append to array being returned
+			topEarningArray = append(topEarningArray, topEarningCreator)
+        }
+
+		resp := GetTopEarningCreatorsResponse { 
+			Response: topEarningArray,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetTopEarningCreators: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetTopEarningCollectorResponse struct {
+	Response []*TopEarningCollector
+}
+type TopEarningCollector struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	EarningsAmount int64  `db:"sum_bid_amount_nanos"`
+	PublicKeyBase58Check string  `db:"bidder_pkid"`
+}
+func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select rollup_timestamp, sum_bid_amount_nanos, bidder_pkid 
+	from analytics.top_nft_investors ORDER BY rollup_timestamp desc LIMIT 20;`
+
+	var topEarningArray []*TopEarningCollector
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+
+			// Store individual collection name
+			topEarningCollector := new(TopEarningCollector)
+			// Need a holder var for the bytea format
+			pk_bytea := new(PPKBytea)
+
+			rows.Scan(
+				&topEarningCollector.Timestamp, 
+				&topEarningCollector.EarningsAmount, 
+				&pk_bytea.Poster_public_key
+			)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error scanning to struct: %v", err))
+				return
+			}
+
+			// Make bytea into string PublicKey
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(pk_bytea.Poster_public_key).PKID
+			publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+
+			// Put string format public key to struct
+			topEarningCollector.PublicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+
+			// Append to array being returned
+			topEarningArray = append(topEarningArray, topEarningCollector)
+        }
+
+		resp := GetTopEarningCollectorsResponse { 
+			Response: topEarningArray,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetTopEarningCollectors: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetTopBidsTodayResponse struct {
+	Response []*TopBid
+}
+type TopBid struct {
+	Timestamp time.Time `db:"rollup_timestamp"`
+	BidderPKID string  `db:"Bidder_pkid"`
+	PostHash string  `db:"Nft_post_hash"`
+	BidAmountNanos int64  `db:"bid_amount_nanos"`
+}
+func (fes *APIServer) GetTopBidsToday(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := BasicAnalyticsRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `select rollup_timestamp, bidder_pkid, encode(nft_post_hash, 'hex') as nft_post_hash, bid_amount_nanos from analytics.top_bids ORDER BY rollup_timestamp desc limit 3;`
+
+	var topBidsArray []*TopBid
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+
+			// Store individual collection name
+			topBid := new(TopBid)
+			// Need a holder var for the bytea format
+			pk_bytea := new(PPKBytea)
+
+			rows.Scan(
+				&topBid.Timestamp, 
+				&pk_bytea.Poster_public_key, 
+				&topBid.PostHash,
+				&topBid.BidAmountNanos
+			)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error scanning to struct: %v", err))
+				return
+			}
+
+			// Make bytea into string PublicKey
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(pk_bytea.Poster_public_key).PKID
+			publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+
+			// Put string format public key to struct
+			topBid.BidderPKID = lib.PkToString(publicKey, fes.Params)
+
+
+			// Append to array being returned
+			topBidsArray = append(topBidsArray, topBid)
+        }
+
+		resp := GetTopBidsTodayResponse { 
+			Response: topBidsArray,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetTopBidsToday: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
+}
+type GetTopNFTSalesRequest struct {
+	ReaderPublicKeyBase58Check string 
+}
+func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetTopNFTSalesRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error parsing request body: %v", err))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var errr error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, errr = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if errr != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", errr))
+			return
+		}
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	// Create the query
+	queryString := `SELECT like_count, diamond_count, comment_count, encode(pg_posts.post_hash, 'hex') as post_hash, 
+	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data 
+	FROM analytics.top_nft_sales_on_deso INNER JOIN pg_posts 
+	ON top_nft_sales_on_deso.post_hash = pg_posts.post_hash LIMIT 10;`
+
+	var topBidsArray []*TopBid
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error query failed: %v", err))
+		return
+	} else {
+
+		// Defer closing rows
+		defer rows.Close()
+
+		var posts []*PostResponse
+		
+        // Next prepares the next row for reading.
+        for rows.Next() {
+
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+
+			rows.Scan(
+				&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData
+			)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error scanning to struct: %v", err))
+				return
+			}
+			if post.PostExtraData["name"] != "" {
+                post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+            }
+            if post.PostExtraData["properties"] != "" {
+                post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+            }
+            if post.PostExtraData["category"] != "" {
+                post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+            }
+            if post.PostExtraData["Node"] != "" {
+                post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+            }
+            if post.PostExtraData["arweaveVideoSrc"] != "" {
+                post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+            }
+            if post.PostExtraData["arweaveAudioSrc"] != "" {
+                post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+            }
+            if post.PostExtraData["arweaveModelSrc"] != "" {
+                post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+            }
+            // Now break down the faulty body into a few parts
+            content := JsonToStruct(body.Body)
+            post.Body = content.Body
+            post.ImageURLs = content.ImageURLs
+            post.VideoURLs = content.VideoURLs
+
+            // Get utxoView
+            utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+            if err != nil {
+                _AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Error getting utxoView: %v", err))
+                return
+            }
+
+            // PKBytes to PKID
+            var posterPKID *lib.PKID
+            posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+            // PKID to profileEntry and PK
+            profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+            var profileEntryResponse *ProfileEntryResponse
+            var publicKeyBase58Check string
+            if profileEntry != nil {
+                profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+                publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+            } else {
+                publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+                publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+            }
+            // Assign it to the post being returned
+            post.PosterPublicKeyBase58Check = publicKeyBase58Check
+            // Assign ProfileEntryResponse
+            post.ProfileEntryResponse = profileEntryResponse
+            // Decode the postHash.
+            postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+            if err != nil {
+                _AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: %v", err))
+                return
+            }
+            // Fetch the postEntry requested.
+            postEntry := utxoView.GetPostEntryForPostHash(postHash)
+            if postEntry == nil {
+                _AddBadRequestError(ww, fmt.Sprintf("GetTopNFTSales: Could not fetch postEntry"))
+                return
+            }
+            // Get info regarding the readers interactions with the post
+            post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+            // Append to array for returning
+            posts = append(posts, post)
+			
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+
+		// Send back response
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetTopNFTSales: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
 }
