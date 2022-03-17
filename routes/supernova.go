@@ -564,7 +564,7 @@ func (fes *APIServer) GetDesoPKbyETHPK(ww http.ResponseWriter, req *http.Request
 	 
 	queryString := fmt.Sprintf("SELECT public_key from pg_profile_details WHERE eth_pk = '%v' LIMIT 1;", requestData.ETHPK)
 
-	err = conn.conn.QueryRow(context.Background(), queryString).Scan(&pkResponse.PublicKeyBase58Check)
+	err = conn.QueryRow(context.Background(), queryString).Scan(&pkResponse.PublicKeyBase58Check)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Insert failed: %v", err))
 		return
