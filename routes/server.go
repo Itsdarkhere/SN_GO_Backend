@@ -260,6 +260,12 @@ const (
 	RoutePathGetUniqueCollectors = "/api/v0/get-unique-collectors"
 	RoutePathGetDesoSalesCapGraph = "/api/v0/get-deso-sales-cap-graph"
 	RoutePathGetDesoMarketCapGraph = "/api/v0/get-deso-market-cap-graph"
+	RoutePathGetTopNFTSales = "/api/v0/get-top-nft-sales"
+	RoutePathGetTopBidsToday = "/api/v0/get-top-bids-today"
+	RoutePathGetTopEarningCollectors = "/api/v0/get-top-earning-collectors"
+	RoutePathGetTopEarningCreators = "/api/v0/get-top-earning-creators"
+	RoutePathGetQuickFacts = "/api/v0/get-quick-facts"
+
 
 	// PG verified list
 	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
@@ -885,6 +891,41 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetDesoMarketCapGraph,
 			fes.GetDesoMarketCapGraph,
+			PublicAccess,
+		},
+		{
+			"GetTopNFTSales",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTopNFTSales,
+			fes.GetTopNFTSales,
+			PublicAccess,
+		},
+		{
+			"GetTopBidsToday",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTopBidsToday,
+			fes.GetTopBidsToday,
+			PublicAccess,
+		},
+		{
+			"GetTopEarningCollectors",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTopEarningCollectors,
+			fes.GetTopEarningCollectors,
+			PublicAccess,
+		},
+		{
+			"GetTopEarningCreators",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTopEarningCreators,
+			fes.GetTopEarningCreators,
+			PublicAccess,
+		},
+		{
+			"GetQuickFacts",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetQuickFacts,
+			fes.GetQuickFacts,
 			PublicAccess,
 		},
 		{
