@@ -3868,7 +3868,7 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data 
 	FROM analytics.top_nft_sales_on_deso INNER JOIN pg_posts 
-	ON top_nft_sales_on_deso.post_hash = pg_posts.post_hash LIMIT 10;`
+	ON top_nft_sales_on_deso.post_hash = encode(pg_posts.post_hash, 'hex') LIMIT 10;`
 
 	var topBidsArray []*TopBid
 
