@@ -3522,7 +3522,7 @@ func (fes *APIServer) GetQuickFacts(ww http.ResponseWriter, req *http.Request) {
         // Next prepares the next row for reading.
         for rows.Next() {
 
-			rows.Scan(&quickFacts.Timestamp, &quickFacts.TotalBFTsSold, &quickFacts.AverageSalesPrice,
+			rows.Scan(&quickFacts.Timestamp, &quickFacts.TotalNFTsSold, &quickFacts.AverageSalesPrice,
 				&quickFacts.AverageCreatorRoyalty, &quickFacts.AverageCoinRoyalty)
 			// Check for errors
 			if rows.Err() != nil {
@@ -3580,6 +3580,13 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 
 	var topEarningArray []*TopEarningCreator
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -3598,11 +3605,9 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topEarningCreator.Timestamp, 
+			rows.Scan(&topEarningCreator.Timestamp, 
 				&topEarningCreator.EarningsAmount, 
-				&pk_bytea.Poster_public_key
-			)
+				&pk_bytea.Poster_public_key)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -3634,7 +3639,7 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 		conn.Release();
 	}
 }
-type GetTopEarningCollectorResponse struct {
+type GetTopEarningCollectorsResponse struct {
 	Response []*TopEarningCollector
 }
 type TopEarningCollector struct {
@@ -3673,6 +3678,13 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 
 	var topEarningArray []*TopEarningCollector
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -3691,11 +3703,9 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topEarningCollector.Timestamp, 
+			rows.Scan(&topEarningCollector.Timestamp, 
 				&topEarningCollector.EarningsAmount, 
-				&pk_bytea.Poster_public_key
-			)
+				&pk_bytea.Poster_public_key)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -3767,6 +3777,13 @@ func (fes *APIServer) GetTopBidsToday(ww http.ResponseWriter, req *http.Request)
 
 	var topBidsArray []*TopBid
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -3785,12 +3802,10 @@ func (fes *APIServer) GetTopBidsToday(ww http.ResponseWriter, req *http.Request)
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topBid.Timestamp, 
+			rows.Scan(&topBid.Timestamp, 
 				&pk_bytea.Poster_public_key, 
 				&topBid.PostHash,
-				&topBid.BidAmountNanos
-			)
+				&topBid.BidAmountNanos)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -3870,7 +3885,6 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 	FROM analytics.top_nft_sales_on_deso INNER JOIN pg_posts 
 	ON top_nft_sales_on_deso.post_hash = pg_posts.post_hash LIMIT 10;`
 
-	var topBidsArray []*TopBid
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -3894,13 +3908,11 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 			// Need a holder var for the bytea format
 			poster_public_key_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+			rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
 				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-				&post.NumNFTCopiesBurned, &post.PostExtraData
-			)
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
