@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
 	"io"
 	"net/http"
 	"reflect"
@@ -30,6 +31,9 @@ type NFTEntryResponse struct {
 	// These fields are only populated when the reader is the owner.
 	LastOwnerPublicKeyBase58Check *string `json:",omitempty"`
 	EncryptedUnlockableText       *string `json:",omitempty"`
+
+	// ExtraData is an arbitrary key value map
+	ExtraData map[string]string `safeForLogging:"true"`
 }
 
 type NFTCollectionResponse struct {
@@ -56,6 +60,9 @@ type NFTBidEntryResponse struct {
 	HighestBidAmountNanos *uint64 `json:",omitempty"`
 	LowestBidAmountNanos  *uint64 `json:",omitempty"`
 
+	// If we fetched the accepted bid history, include the accepted block height.
+	AcceptedBlockHeight *uint32 `json:",omitempty"`
+
 	// Current balance of this bidder.
 	BidderBalanceNanos uint64
 }
@@ -73,6 +80,7 @@ type CreateNFTRequest struct {
 	BuyNowPriceNanos               uint64            `safeForLogging:"true"`
 	AdditionalDESORoyaltiesMap     map[string]uint64 `safeForLogging:"true"`
 	AdditionalCoinRoyaltiesMap     map[string]uint64 `safeForLogging:"true"`
+	ExtraData                      map[string]string `safeForLogging:"true"`
 
 	MinFeeRateNanosPerKB uint64 `safeForLogging:"true"`
 
@@ -244,6 +252,7 @@ func (fes *APIServer) CreateNFT(ww http.ResponseWriter, req *http.Request) {
 		requestData.BuyNowPriceNanos,
 		additionalDESORoyaltiesPubKeyMap,
 		additionalCoinRoyaltiesPubKeyMap,
+		preprocessExtraData(requestData.ExtraData),
 		requestData.MinFeeRateNanosPerKB, fes.backendServer.GetMempool(), additionalOutputs)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("CreateNFT: Problem creating transaction: %v", err))
@@ -1379,6 +1388,7 @@ func (fes *APIServer) _nftEntryToResponse(nftEntry *lib.NFTEntry, postEntryRespo
 		EncryptedUnlockableText:       encryptedUnlockableText,
 		LastOwnerPublicKeyBase58Check: lastOwnerPublicKeyBase58Check,
 		LastAcceptedBidAmountNanos:    nftEntry.LastAcceptedBidAmountNanos,
+		ExtraData:                     extraDataToResponse(nftEntry.ExtraData),
 	}
 }
 
@@ -1482,6 +1492,7 @@ func (fes *APIServer) _bidEntryToResponse(bidEntry *lib.NFTBidEntry, postEntryRe
 
 		HighestBidAmountNanos: highBid,
 		LowestBidAmountNanos:  lowBid,
+		AcceptedBlockHeight:   bidEntry.AcceptedBlockHeight,
 		BidderBalanceNanos:    bidderBalanceNanos,
 	}
 }
@@ -2071,6 +2082,82 @@ func (fes *APIServer) GetNFTsCreatedByPublicKey(ww http.ResponseWriter, req *htt
 
 	if err = json.NewEncoder(ww).Encode(res); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("GetNFTsCreatedByPublicKey: Problem serializing object to JSON: %v", err))
+		return
+	}
+}
+
+type GetAcceptedBidHistoryResponse struct {
+	AcceptedBidHistoryMap map[uint64][]*NFTBidEntryResponse
+}
+
+func (fes *APIServer) GetAcceptedBidHistory(ww http.ResponseWriter, req *http.Request) {
+
+	vars := mux.Vars(req)
+
+	postHashHex, postHashHexExists := vars["postHashHex"]
+	if !postHashHexExists {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAcceptedBidHistory: PostHashHex required"))
+		return
+	}
+
+	// Get the PostHash for the NFT.
+	nftPostHashBytes, err := hex.DecodeString(postHashHex)
+	if err != nil || len(nftPostHashBytes) != lib.HashSizeBytes {
+		_AddBadRequestError(ww, fmt.Sprintf(
+			"GetAcceptedBidHistory: Error parsing post hash %v: %v",
+			postHashHex, err))
+		return
+	}
+	nftPostHash := &lib.BlockHash{}
+	copy(nftPostHash[:], nftPostHashBytes)
+
+	// Get a view
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAcceptedBidHistory: Error getting utxoView: %v", err))
+		return
+	}
+
+	postEntry := utxoView.GetPostEntryForPostHash(nftPostHash)
+	if postEntry == nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAcceptedBidHistory: No PostEntry found for post hash hex %v", postHashHex))
+		return
+	}
+
+	if !postEntry.IsNFT {
+		_AddBadRequestError(ww, fmt.Sprintf("GetAcceptedBidHistory: Post %v is not an NFT", postHashHex))
+		return
+	}
+
+	acceptedBidHistoryMap := make(map[uint64][]*NFTBidEntryResponse)
+
+	for ii := uint64(1); ii <= postEntry.NumNFTCopies; ii++ {
+		nftKey := lib.MakeNFTKey(nftPostHash, ii)
+		nftEntry := utxoView.GetNFTEntryForNFTKey(&nftKey)
+		// If NFT entry doesn't exist, that means it is burned.
+		if nftEntry == nil {
+			continue
+		}
+		acceptedBidEntries := utxoView.GetAcceptNFTBidHistoryForNFTKey(&nftKey)
+		if acceptedBidEntries == nil {
+			acceptedBidHistoryMap[ii] = []*NFTBidEntryResponse{}
+			continue
+		}
+		var acceptedBidEntryResponses []*NFTBidEntryResponse
+		for _, acceptedBidEntry := range *acceptedBidEntries {
+			acceptedBidEntryResponses = append(acceptedBidEntryResponses,
+				fes._bidEntryToResponse(
+					acceptedBidEntry, nil, utxoView, false, false))
+		}
+		acceptedBidHistoryMap[ii] = acceptedBidEntryResponses
+	}
+
+	res := &GetAcceptedBidHistoryResponse{
+		AcceptedBidHistoryMap: acceptedBidHistoryMap,
+	}
+
+	if err = json.NewEncoder(ww).Encode(res); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetAcceptedBidHistory: Problem serializing object to JSON: %v", err))
 		return
 	}
 }
