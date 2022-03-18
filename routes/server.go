@@ -267,7 +267,6 @@ const (
 	RoutePathGetTopEarningCreators = "/api/v0/get-top-earning-creators"
 	RoutePathGetQuickFacts = "/api/v0/get-quick-facts"
 
-
 	// PG verified list
 	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
 	RoutePathInsertOrUpdateProfileDetails = "/api/v0/insert-or-update-profile-details"
@@ -281,6 +280,10 @@ const (
 	RoutePathGetCommunityFavourites = "/api/v0/get-community-favourites"
 	RoutePathGetFreshDrops = "/api/v0/get-fresh-drops"
 	RoutePathGetNFTsByCategory = "/api/v0/get-nfts-by-category"
+	RoutePathGetTrendingAuctions = "/api/v0/get-trending-auctions"
+	RoutePathGetRecentSales = "/api/v0/get-recent-sales"
+	RoutePathGetSecondaryListings = "/api/v0/get-secondary-listings"
+
 	// Supernovas emails
 	RoutePathSendVerifyEmailEmail = "/api/v0/send-verify-email-email"
 	RoutePathSendLostNFTEmail = "/api/v0/send-lost-nft-email"
@@ -1075,6 +1078,27 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetNFTsByCategory,
 			fes.GetNFTsByCategory,
+			PublicAccess,
+		},
+		{
+			"GetTrendingAuctions",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTrendingAuctions,
+			fes.GetTrendingAuctions,
+			PublicAccess,
+		},
+		{
+			"GetRecentSales",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetRecentSales,
+			fes.GetRecentSales,
+			PublicAccess,
+		},
+		{
+			"GetSecondaryListings",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetSecondaryListings,
+			fes.GetSecondaryListings,
 			PublicAccess,
 		},
 		{

@@ -2617,6 +2617,477 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 		conn.Release()
 	}
 }
+func (fes *APIServer) GetTrendingAuctions(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetNFTShowcaseRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error parsing request body: %v", err))
+		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Problem decoding reader public key: %v", err))
+			return
+		}
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+
+	rows, err := conn.Query(context.Background(),
+	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash
+	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale > 0 
+	AND num_nft_copies != num_nft_copies_burned
+	ORDER BY bid_amount_nanos desc LIMIT 8`)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error query failed: %v", err))
+		return
+	} else {
+
+		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error scanning to struct: %v", err))
+					return
+				}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			if post.PostExtraData["arweaveVideoSrc"] != "" {
+				post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+			}
+			if post.PostExtraData["arweaveAudioSrc"] != "" {
+				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Could not fetch postEntry"))
+				return
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetTrendingAuctions: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure
+		conn.Release()
+	}
+}
+func (fes *APIServer) GetRecentSales(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetNFTShowcaseRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error parsing request body: %v", err))
+		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Problem decoding reader public key: %v", err))
+			return
+		}
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+
+	rows, err := conn.Query(context.Background(),
+	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash
+	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale = 0 
+	AND num_nft_copies != num_nft_copies_burned AND last_accepted_bid_amount_nanos > 0
+	ORDER BY timestamp desc LIMIT 8`)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error query failed: %v", err))
+		return
+	} else {
+
+		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error scanning to struct: %v", err))
+					return
+				}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			if post.PostExtraData["arweaveVideoSrc"] != "" {
+				post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+			}
+			if post.PostExtraData["arweaveAudioSrc"] != "" {
+				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetRecentSales: Could not fetch postEntry"))
+				return
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetRecentSales: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure
+		conn.Release()
+	}
+}
+func (fes *APIServer) GetSecondaryListings(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetNFTShowcaseRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error parsing request body: %v", err))
+		return
+	}
+
+	var readerPublicKeyBytes []byte
+	var err error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, err = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if err != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Problem decoding reader public key: %v", err))
+			return
+		}
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+
+	rows, err := conn.Query(context.Background(),
+	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash
+	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale > 0 
+	AND num_nft_copies != num_nft_copies_burned AND owner_pkid != poster_public_key
+	ORDER BY timestamp desc LIMIT 8`)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error query failed: %v", err))
+		return
+	} else {
+
+		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+            rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
+				// Check for errors
+				if rows.Err() != nil {
+					// if any error occurred while reading rows.
+					_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error scanning to struct: %v", err))
+					return
+				}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+			if post.PostExtraData["arweaveVideoSrc"] != "" {
+				post.PostExtraData["arweaveVideoSrc"] = base64Decode(post.PostExtraData["arweaveVideoSrc"])
+			}
+			if post.PostExtraData["arweaveAudioSrc"] != "" {
+				post.PostExtraData["arweaveAudiooSrc"] = base64Decode(post.PostExtraData["arweaveAudioSrc"])
+			}
+			if post.PostExtraData["arweaveModelSrc"] != "" {
+				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("GetSecondaryListings: Could not fetch postEntry"))
+				return
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("GetSecondaryListings: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure
+		conn.Release()
+	}
+}
 type GetNFTsByCategoryRequest struct {
 	ReaderPublicKeyBase58Check string `safeForLogging:"true"`
 	Category string `safeForLogging:"true"`
