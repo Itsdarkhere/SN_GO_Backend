@@ -2232,9 +2232,9 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 	// Loop through array and construct a string to use in insert
 	for i := 0; i < len(idArray); i++ {
 		if (i + 1 == len(idArray)) {
-			idArrayPGFormat = idArrayPGFormat + "encode(" + idArray[i] + ", 'base64')"
+			idArrayPGFormat = idArrayPGFormat + "encode('" + idArray[i] + "', 'base64')"
 		} else {
-			idArrayPGFormat = idArrayPGFormat + "encode(" + idArray[i] + ", 'base64'),"
+			idArrayPGFormat = idArrayPGFormat + "encode('" + idArray[i] + "', 'base64'),"
 		}
 	}
 	idArrayPGFormat = idArrayPGFormat + ")"
