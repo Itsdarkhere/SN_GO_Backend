@@ -564,7 +564,7 @@ func (fes *APIServer) GetDesoPKbyETHPK(ww http.ResponseWriter, req *http.Request
 	 
 	queryString := fmt.Sprintf("SELECT public_key from pg_profile_details WHERE eth_pk = '%v' LIMIT 1;", requestData.ETHPK)
 
-	err = conn.conn.QueryRow(context.Background(), queryString).Scan(&pkResponse.PublicKeyBase58Check)
+	err = conn.QueryRow(context.Background(), queryString).Scan(&pkResponse.PublicKeyBase58Check)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetDesoPKbyETHPK: Insert failed: %v", err))
 		return
@@ -1476,7 +1476,7 @@ func (fes *APIServer) InsertOrUpdateIMXPK(ww http.ResponseWriter, req *http.Requ
 		ON CONFLICT (public_key) DO UPDATE 
 		SET eth_pk = excluded.eth_pk;`, requestData.PublicKeyBase58Check, requestData.ETH_PublicKey)
 
-	err = conn.Exec(context.Background(), queryString)
+	_, err = conn.Exec(context.Background(), queryString)
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("InsertOrUpdateIMXPK: Insert failed: %v", err))
 		return
@@ -3961,7 +3961,7 @@ func (fes *APIServer) GetDesoMarketCapGraph(ww http.ResponseWriter, req *http.Re
 	LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*DesoMarketCapGraphItem
+	var graphResponse []*DesoMarketCapGraphItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -4042,7 +4042,7 @@ func (fes *APIServer) GetDesoSalesCapGraph(ww http.ResponseWriter, req *http.Req
 	LIMIT 30;`
 
 	// Store response in this
-	graphResponse := []*DesoSalesCapGraphItem
+	var graphResponse []*DesoSalesCapGraphItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -4124,7 +4124,7 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 	`
 
 	// Store response in this
-	graphResponse := []*UniqueCollectorsItem
+	var graphResponse []*UniqueCollectorsItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -4166,7 +4166,7 @@ func (fes *APIServer) GetUniqueCollectors(ww http.ResponseWriter, req *http.Requ
 	}
 }
 type GetUniqueCreatorsResponse struct {
-	Response []*UniqueCollectorsItem
+	Response []*UniqueCreatorsItem
 }
 type UniqueCreatorsItem struct {
 	Timestamp time.Time `db:"rollup_timestamp"`
@@ -4206,7 +4206,7 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 	`
 
 	// Store response in this
-	graphResponse := []*UniqueCreatorsItem
+	var graphResponse []*UniqueCreatorsItem
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -4223,7 +4223,7 @@ func (fes *APIServer) GetUniqueCreators(ww http.ResponseWriter, req *http.Reques
 			// Store individual collection name
 			graphItem := new(UniqueCreatorsItem)
 
-			rows.Scan(&graphItem.Timestamp, &graphItem.CollectorsAmount)
+			rows.Scan(&graphItem.Timestamp, &graphItem.CreatorsAmount)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -4298,7 +4298,7 @@ func (fes *APIServer) GetQuickFacts(ww http.ResponseWriter, req *http.Request) {
         // Next prepares the next row for reading.
         for rows.Next() {
 
-			rows.Scan(&quickFacts.Timestamp, &quickFacts.TotalBFTsSold, &quickFacts.AverageSalesPrice,
+			rows.Scan(&quickFacts.Timestamp, &quickFacts.TotalNFTsSold, &quickFacts.AverageSalesPrice,
 				&quickFacts.AverageCreatorRoyalty, &quickFacts.AverageCoinRoyalty)
 			// Check for errors
 			if rows.Err() != nil {
@@ -4359,6 +4359,13 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 
 	var topEarningArray []*TopEarningCreator
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCreators: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -4377,12 +4384,10 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topEarningCreator.Timestamp, 
+			rows.Scan(&topEarningCreator.Timestamp, 
 				&topEarningCreator.EarningsAmount, 
 				&pk_bytea.Poster_public_key,
-				&topEarningCreator.Username 
-			)
+				&topEarningCreator.Username)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -4414,7 +4419,7 @@ func (fes *APIServer) GetTopEarningCreators(ww http.ResponseWriter, req *http.Re
 		conn.Release();
 	}
 }
-type GetTopEarningCollectorResponse struct {
+type GetTopEarningCollectorsResponse struct {
 	Response []*TopEarningCollector
 }
 type TopEarningCollector struct {
@@ -4456,6 +4461,13 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 
 	var topEarningArray []*TopEarningCollector
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopEarningCollectors: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -4474,12 +4486,10 @@ func (fes *APIServer) GetTopEarningCollectors(ww http.ResponseWriter, req *http.
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topEarningCollector.Timestamp, 
+			rows.Scan(&topEarningCollector.Timestamp, 
 				&topEarningCollector.EarningsAmount, 
 				&pk_bytea.Poster_public_key,
-				&topEarningCollector.Username
-			)
+				&topEarningCollector.Username)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -4551,6 +4561,13 @@ func (fes *APIServer) GetTopBidsToday(ww http.ResponseWriter, req *http.Request)
 
 	var topBidsArray []*TopBid
 
+	// Get utxoView
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTopBidsToday: Error getting utxoView: %v", err))
+		return
+	}
+
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
 	if err != nil {
@@ -4569,12 +4586,10 @@ func (fes *APIServer) GetTopBidsToday(ww http.ResponseWriter, req *http.Request)
 			// Need a holder var for the bytea format
 			pk_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&topBid.Timestamp, 
+			rows.Scan(&topBid.Timestamp, 
 				&pk_bytea.Poster_public_key, 
 				&topBid.PostHash,
-				&topBid.BidAmountNanos
-			)
+				&topBid.BidAmountNanos)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
@@ -4654,7 +4669,6 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 	FROM analytics.top_nft_sales_on_deso INNER JOIN pg_posts 
 	ON top_nft_sales_on_deso.post_hash = encode(pg_posts.post_hash, 'hex') LIMIT 10;`
 
-	var topBidsArray []*TopBid
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -4678,13 +4692,11 @@ func (fes *APIServer) GetTopNFTSales(ww http.ResponseWriter, req *http.Request) 
 			// Need a holder var for the bytea format
 			poster_public_key_bytea := new(PPKBytea)
 
-			rows.Scan(
-				&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
+			rows.Scan(&post.LikeCount, &post.DiamondCount, &post.CommentCount, &post.PostHashHex, 
 				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
 				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
 				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.NumNFTCopiesForSale,
-				&post.NumNFTCopiesBurned, &post.PostExtraData
-			)
+				&post.NumNFTCopiesBurned, &post.PostExtraData)
 			// Check for errors
 			if rows.Err() != nil {
 				// if any error occurred while reading rows.
