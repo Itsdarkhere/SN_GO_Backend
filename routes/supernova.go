@@ -2185,7 +2185,239 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		// Just to make sure call it here too, calling it multiple times has no side-effects
 		conn.Release();
 	}
+}
+type SortETHMarketplaceRequest struct {
+	ReaderPublicKeyBytes string 
+	TokenIdArray []string 
+	Category string 
+	SortType string 
+	CreatorsType string 
+}
+func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := SortETHMarketplaceRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error parsing request body: %v", err))
+		return
+	}
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
 
+	// Release connection once function returns
+	defer conn.Release();
+
+	var readerPublicKeyBytes []byte
+	var errr error
+	if requestData.ReaderPublicKeyBase58Check != "" {
+		readerPublicKeyBytes, _, errr = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
+		if errr != nil {
+			_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Problem decoding reader public key: %v", errr))
+			return
+		}
+	}
+	// Build a string to query postgres with from tokenIdArray
+	idArray := requestData.TokenIdArray
+	idArrayPGFormat := "("
+	// Loop through array and construct a string to use in insert
+	for i := 0; i < len(idArray); i++ {
+		if (i + 1 == len(idArray)) {
+			idArrayPGFormat = idArrayPGFormat + "encode(" + idArray[i] + ", 'base64')"
+		} else {
+			idArrayPGFormat = idArrayPGFormat + "encode(" + idArray[i] + ", 'base64'),"
+		}
+	}
+	idArrayPGFormat = idArrayPGFormat + ")"
+	// The basic variables are the base layer of the marketplace query
+	// Based on user filtering we add options to it
+	basic_select := `SELECT encode(post_hash, 'hex') as post_hash, diamond_count, comment_count, 
+	like_count, poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
+	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
+	coin_royalty_basis_points, extra_data`
+
+	basic_from := ` FROM pg_posts`
+
+	basic_inner_join := ""
+
+	basic_where := ` WHERE extra_data->>'isEthereumNFT' = 'dHJ1ZQ==' AND extra_data->>'tokenId' IN ` + idArrayPGFormat
+
+	basic_group_by := " GROUP BY post_hash"
+
+	basic_limit := ` LIMIT 30`
+
+	basic_order_by := " ORDER BY"
+
+	// The switches below are in order, changing could cause problems
+	
+	// switch for category
+	switch requestData.Category {
+		case "all":
+			// Do nothing
+		case "photography":
+			basic_where = basic_where + " AND extra_data->>'category' = 'UGhvdG9ncmFwaHk='"
+		case "profile picture":
+			basic_where = basic_where + " AND extra_data->>'category' = 'UHJvZmlsZSBQaWN0dXJl'"
+		case "music":
+			basic_where = basic_where + " AND extra_data->>'category' = 'TXVzaWM='"
+		case "metaverse":
+			basic_where = basic_where + " AND extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n'"
+		case "art":
+			basic_where = basic_where + " AND extra_data->>'category' = 'QXJ0'"
+		case "collectibles":
+			basic_where = basic_where + " AND extra_data->>'category' = 'Q29sbGVjdGlibGVz'"
+		case "generative art":
+			basic_where = basic_where + " AND extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ='"
+		default:
+			_AddBadRequestError(ww, "SortETHMarketplace: Error in category switch")
+			return
+	}
+	// Switch for sort
+	switch requestData.SortType {
+		case "most recent first":
+			basic_order_by = basic_order_by + " timestamp desc"
+		case "oldest first":
+			basic_order_by = basic_order_by + " timestamp asc"
+		case "most likes first":
+			basic_order_by = basic_order_by + " like_count desc"
+		case "most diamonds first":
+			basic_order_by = basic_order_by + " diamond_count desc"
+		case "most comments first":
+			basic_order_by = basic_order_by + " comment_count desc"
+		case "most reposts first":
+			basic_order_by = basic_order_by + " repost_count desc"
+		default:
+			_AddBadRequestError(ww, "SortETHMarketplace: Error in sort switch")
+			return
+	}
+	
+	// Switch for 
+	switch requestData.CreatorsType {
+		case "all":
+			// Do nothing
+		case "verified":
+			basic_inner_join = basic_inner_join + " INNER JOIN pg_verified ON pg_verified.public_key = pg_posts.poster_public_key"
+		default:
+			_AddBadRequestError(ww, "SortETHMarketplace: Error in creators switch")
+			return
+	}
+
+	// Concat the superstring 
+	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_group_by + basic_order_by + basic_offset + basic_limit
+
+	// Query
+	rows, err := conn.Query(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error query failed: %v", err))
+		return
+	} else {
+
+		var posts []*PostResponse
+
+		// Defer closing rows
+		defer rows.Close()
+
+        // Next prepares the next row for reading.
+        for rows.Next() {
+			// New post to insert values into
+			post := new(PostResponse)
+			// Body is weird in db so I need this to parse it
+			body := new(Body)
+			// Need a holder var for the bytea format
+			poster_public_key_bytea := new(PPKBytea)
+            // Scan reads the values from the current row into tmp
+			rows.Scan(&post.PostHashHex, &post.DiamondCount, &post.CommentCount, &post.LikeCount,
+				&poster_public_key_bytea.Poster_public_key, &body.Body, &post.TimestampNanos, &post.IsHidden, &post.RepostCount, 
+				&post.QuoteRepostCount, &post.IsPinned, &post.IsNFT, &post.NumNFTCopies, &post.HasUnlockable,
+				&post.NFTRoyaltyToCoinBasisPoints, &post.NFTRoyaltyToCreatorBasisPoints, &post.PostExtraData)
+			// Check for errors
+			if rows.Err() != nil {
+				// if any error occurred while reading rows.
+				_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error scanning to struct: %v", err))
+				return
+			}
+			if post.PostExtraData["name"] != "" {
+				post.PostExtraData["name"] = base64Decode(post.PostExtraData["name"])
+			}
+			if post.PostExtraData["properties"] != "" {
+				post.PostExtraData["properties"] = base64Decode(post.PostExtraData["properties"])
+			}
+			if post.PostExtraData["category"] != "" {
+				post.PostExtraData["category"] = base64Decode(post.PostExtraData["category"])
+			}
+			if post.PostExtraData["Node"] != "" {
+				post.PostExtraData["Node"] = base64Decode(post.PostExtraData["Node"])
+			}
+
+			// Now break down the faulty body into a few parts
+			content := JsonToStruct(body.Body)
+			post.Body = content.Body
+			post.ImageURLs = content.ImageURLs
+			post.VideoURLs = content.VideoURLs
+
+			// Get utxoView
+			utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Error getting utxoView: %v", err))
+				return
+			}
+
+			// PKBytes to PKID
+			var posterPKID *lib.PKID
+			posterPKID = utxoView.GetPKIDForPublicKey(poster_public_key_bytea.Poster_public_key).PKID
+
+			// PKID to profileEntry and PK
+			profileEntry := utxoView.GetProfileEntryForPKID(posterPKID)
+			var profileEntryResponse *ProfileEntryResponse
+			var publicKeyBase58Check string
+			if profileEntry != nil {
+				profileEntryResponse = fes._profileEntryToResponse(profileEntry, utxoView)
+				publicKeyBase58Check = profileEntryResponse.PublicKeyBase58Check
+			} else {
+				publicKey := utxoView.GetPublicKeyForPKID(posterPKID)
+				publicKeyBase58Check = lib.PkToString(publicKey, fes.Params)
+			}
+			// Assign it to the post being returned
+			post.PosterPublicKeyBase58Check = publicKeyBase58Check
+			// Assign ProfileEntryResponse
+			post.ProfileEntryResponse = profileEntryResponse
+			// Decode the postHash.
+			postHash, err := GetPostHashFromPostHashHex(post.PostHashHex)
+			if err != nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: %v", err))
+				return
+			}
+			// Fetch the postEntry requested.
+			postEntry := utxoView.GetPostEntryForPostHash(postHash)
+			if postEntry == nil {
+				_AddBadRequestError(ww, fmt.Sprintf("SortETHMarketplace: Could not find PostEntry for postHash"))
+				return
+			}
+			// Get info regarding the readers interactions with the post
+			post.PostEntryReaderState = utxoView.GetPostEntryReaderState(readerPublicKeyBytes, postEntry)
+			// Append to array for returning
+			posts = append(posts, post)
+        }
+
+		resp := PostResponses {
+			PostEntryResponse: posts,
+		}
+		if err = json.NewEncoder(ww).Encode(resp); err != nil {
+			_AddInternalServerError(ww, fmt.Sprintf("SortETHMarketplace: Problem serializing object to JSON: %v", err))
+			return
+		}
+		// Just to make sure call it here too, calling it multiple times has no side-effects
+		conn.Release();
+	}
 }
 type SortCreatorsResponses struct {
 	SortCreatorsResponses []*SortCreatorsProfileResponse

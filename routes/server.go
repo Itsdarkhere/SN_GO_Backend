@@ -259,6 +259,7 @@ const (
 	RoutePathUpdateIMXMetadataPostHash = "/api/v0/update-imx-post-hash"
 	RoutePathInsertOrUpdateIMXPK = "/api/v0/insert-or-update-imx-pk"
 	RoutePathGetDesoPKbyETHPK = "/api/v0/get-deso-pk-by-ethpk"
+	RoutePathSortETHMarketplace = "/api/v0/sort-eth-marketplace"
 	// SUPERNOVAS ANALYTICS
 	RoutePathGetUniqueCreators = "/api/v0/get-unique-creators"
 	RoutePathGetUniqueCollectors = "/api/v0/get-unique-collectors"
@@ -848,6 +849,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetDesoPKbyETHPK,
 			fes.GetDesoPKbyETHPK,
+			PublicAccess,
+		},
+		{
+			"SortETHMarketplace",
+			[]string{"POST", "OPTIONS"},
+			RoutePathSortETHMarketplace,
+			fes.SortETHMarketplace,
 			PublicAccess,
 		},
 		{
