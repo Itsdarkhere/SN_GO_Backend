@@ -2187,7 +2187,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	}
 }
 type SortETHMarketplaceRequest struct {
-	ReaderPublicKeyBytes string 
+	ReaderPublicKeyBase58Check string 
 	TokenIdArray []string 
 	Category string 
 	SortType string 
@@ -2312,7 +2312,7 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 	}
 
 	// Concat the superstring 
-	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_group_by + basic_order_by + basic_offset + basic_limit
+	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_group_by + basic_order_by + basic_limit
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
