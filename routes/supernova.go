@@ -2894,16 +2894,18 @@ func (fes *APIServer) GetTrendingAuctions(ww http.ResponseWriter, req *http.Requ
 	// Release connection once function returns
 	defer conn.Release();
 
+	// Minus one week in Nanos
+    timeUnix := uint64(time.Now().UnixNano()) - 259200000000000
 
 	rows, err := conn.Query(context.Background(),
-	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
+	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
 	INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash
-	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale > 0 
+	WHERE timestamp > %+v AND hidden = false AND nft = true AND num_nft_copies_for_sale > 0 
 	AND num_nft_copies != num_nft_copies_burned
-	ORDER BY bid_amount_nanos desc LIMIT 9`)
+	ORDER BY bid_amount_nanos desc LIMIT 9`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error query failed: %v", err))
 		return
