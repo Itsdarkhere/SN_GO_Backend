@@ -77,7 +77,7 @@ func (fes *APIServer) SendVerifyEmailEmail(ww http.ResponseWriter, req *http.Req
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 8,
+		TemplateId: 13,
 		Params: &params,
 	}
 
@@ -157,7 +157,7 @@ func (fes *APIServer) SendLostNFTEmail(ww http.ResponseWriter, req *http.Request
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 15,
+		TemplateId: 6,
 		Params: &params,
 	}
 
@@ -331,7 +331,7 @@ func (fes *APIServer) SendInactiveUserEmail(ww http.ResponseWriter, req *http.Re
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 12,
+		TemplateId: 10,
 		Params: &params,
 	}
 
@@ -408,7 +408,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 13,
+		TemplateId: 16,
 		Params: &params,
 	}
 
@@ -503,7 +503,7 @@ func (fes *APIServer) SendBidAgainEmail(ww http.ResponseWriter, req *http.Reques
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 23,
+		TemplateId: 12,
 		Params: &params,
 	}
 
@@ -598,7 +598,7 @@ func (fes *APIServer) SendWonNFTEmail(ww http.ResponseWriter, req *http.Request)
 			Email: "mikaela@supernovas.app",
 		},
 		To: []sendinblue.SendSmtpEmailTo{},
-		TemplateId: 24,
+		TemplateId: 5,
 		Params: &params,
 	}
 
