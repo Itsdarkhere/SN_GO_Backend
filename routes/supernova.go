@@ -2249,7 +2249,8 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 
 	basic_inner_join := ""
 
-	basic_where := ` WHERE extra_data->>'isEthereumNFT' = 'dHJ1ZQ==' AND extra_data->>'tokenId' IN ` + idArrayPGFormat
+	basic_where := ` WHERE extra_data->>'isEthereumNFT' = 'dHJ1ZQ==' AND extra_data->>'ethContractNumber' = 'MQ==' 
+	AND extra_data->>'tokenId' IN ` + idArrayPGFormat
 
 	basic_group_by := " GROUP BY post_hash"
 
@@ -2363,8 +2364,8 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 			if post.PostExtraData["tokenId"] != "" {
 				post.PostExtraData["tokenId"] = base64Decode(post.PostExtraData["tokenId"])
 			}
-			if post.PostExtraData["ethContract"] != "" {
-				post.PostExtraData["ethContract"] = base64Decode(post.PostExtraData["ethContract"])
+			if post.PostExtraData["ethContractNumber"] != "" {
+				post.PostExtraData["ethContractNumber"] = base64Decode(post.PostExtraData["ethContractNumber"])
 			}
 
 			// Now break down the faulty body into a few parts
