@@ -2905,6 +2905,7 @@ func (fes *APIServer) GetTrendingAuctions(ww http.ResponseWriter, req *http.Requ
 	INNER JOIN pg_nft_bids ON pg_nft_bids.nft_post_hash = post_hash
 	WHERE timestamp > %+v AND hidden = false AND nft = true AND num_nft_copies_for_sale > 0 
 	AND num_nft_copies != num_nft_copies_burned
+	GROUP BY pg_posts.post_hash, bid_amount_nanos
 	ORDER BY bid_amount_nanos desc LIMIT 9`, timeUnix))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetTrendingAuctions: Error query failed: %v", err))
