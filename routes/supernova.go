@@ -2363,6 +2363,9 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 			if post.PostExtraData["tokenId"] != "" {
 				post.PostExtraData["tokenId"] = base64Decode(post.PostExtraData["tokenId"])
 			}
+			if post.PostExtraData["ethContract"] != "" {
+				post.PostExtraData["ethContract"] = base64Decode(post.PostExtraData["ethContract"])
+			}
 
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
