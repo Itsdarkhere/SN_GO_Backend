@@ -2249,7 +2249,7 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 
 	basic_inner_join := ""
 
-	basic_where := ` WHERE extra_data->>'isEthereumNFT' = 'dHJ1ZQ==' AND extra_data->>'ethContractNumber' = 'MQ==' 
+	basic_where := ` WHERE extra_data->>'isEthereumNFT' = 'dHJ1ZQ==' AND extra_data->>'ethContractNumber' = 'Mg==' 
 	AND extra_data->>'tokenId' IN ` + idArrayPGFormat
 
 	basic_group_by := " GROUP BY post_hash"
