@@ -1365,6 +1365,99 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	connection.Release();
 
 }
+type AddToCollectionResponse struct {
+	Response string 
+}
+
+type AddToCollectionRequest struct {
+	PostHashHexArray        []string
+	Username                string `safeForLogging:"true"`
+	CollectionName          string `safeForLogging:"true"`
+}
+
+func (fes *APIServer) AddToCollection(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := AddToCollectionRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToCollection: Error parsing request body: %v", err))
+		return
+	}
+
+	if len(requestData.PostHashHexArray) < 1 {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToCollection: No postHashHex sent in request"))
+		return
+	}
+	hexArray := requestData.PostHashHexArray
+	hexArrayPGFormat := "("
+	// Loop through array and construct a string to use in insert
+	for i := 0; i < len(hexArray); i++ {
+		if (i + 1 == len(hexArray)) {
+			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "'"
+		} else {
+			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "',"
+		}
+	}
+	hexArrayPGFormat = hexArrayPGFormat + ")"
+	if requestData.Username == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToCollection: No Username sent in request"))
+		return
+	}
+	username := requestData.Username
+	if requestData.CollectionName == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToCollection: No CollectionName sent in request"))
+		return
+	}
+	collectionName := requestData.CollectionName
+
+	conn, err := CustomConnect();
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToCollection: Error getting pool: %v", err))
+		return
+	}
+	connection, err := conn.Acquire(context.Background())
+	if err != nil {
+		fmt.Println("AddToCollection: ERROR WITH POSTGRES CONNECTION")
+	}
+	
+	selectString := fmt.Sprintf(`SELECT pg_posts.post_hash, '%v', '%v', collection_description, banner_location, 
+	pp_location FROM pg_posts INNER JOIN pg_sn_collections ON collection = 'name' AND creator_name = 'juvonen' 
+	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, hexArrayPGFormat)
+	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
+
+	// Query
+	rows, err := connection.Query(context.Background(), queryString)
+	if err != nil {
+        _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: Error connecting to postgres: ", err))
+		return
+    }
+
+    for rows.Next() {
+		s := ""
+        if err := rows.Scan(&s); 
+		err != nil {
+            _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: ERROR: ", err))
+			return
+        }
+    }
+    if err := rows.Err(); err != nil {
+        _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: ERROR: ", err))
+		return
+    }
+
+	resp := AddToCollectionResponse { 
+		Response: "Success",
+	}
+
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToCollection: Problem serializing object to JSON: %v", err))
+		return
+	}
+
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	connection.Release();
+
+}
+
 type InsertOrUpdateProfileDetailsRequest struct {
 	PublicKeyBase58Check string
 	Twitter string
