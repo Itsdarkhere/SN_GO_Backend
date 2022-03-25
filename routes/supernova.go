@@ -1419,7 +1419,7 @@ func (fes *APIServer) AddToCollection(ww http.ResponseWriter, req *http.Request)
 		fmt.Println("AddToCollection: ERROR WITH POSTGRES CONNECTION")
 	}
 	
-	selectString := fmt.Sprintf(`SELECT pg_posts.post_hash, '%v', '%v', collection_description, banner_location, 
+	selectString := fmt.Sprintf(`SELECT DISTINCT ON (pg_posts.post_hash) pg_posts.post_hash, '%v', '%v', collection_description, banner_location, 
 	pp_location FROM pg_posts INNER JOIN pg_sn_collections ON collection = 'name' AND creator_name = 'juvonen' 
 	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, hexArrayPGFormat)
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
