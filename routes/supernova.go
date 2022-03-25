@@ -377,12 +377,12 @@ func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Re
 
 		// Defer closing rows
 		defer rows.Close()
-
-		// Store individual rows in this
-		userCollectionsResponse := new(GetAllUserCollectionsResponse)
 		
         // Next prepares the next row for reading.
         for rows.Next() {
+			// Store individual rows in this
+			userCollectionsResponse := new(GetAllUserCollectionsResponse)
+
 			rows.Scan(&userCollectionsResponse.Collection, &userCollectionsResponse.FloorPrice, &userCollectionsResponse.Pieces,
 				&userCollectionsResponse.CollectionCreatorName, &userCollectionsResponse.CollectionDescription, &userCollectionsResponse.CollectionBannerLocation,
 				&userCollectionsResponse.CollectionProfilePicLocation)
