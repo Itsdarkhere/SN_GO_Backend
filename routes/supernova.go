@@ -1333,22 +1333,9 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
 
 	// Query
-	rows, err := connection.Query(context.Background(), queryString)
+	_, err := connection.Exec(context.Background(), queryString)
 	if err != nil {
-        _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Error connecting to postgres: ", err))
-		return
-    }
-
-    for rows.Next() {
-		s := ""
-        if err := rows.Scan(&s); 
-		err != nil {
-            _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: ERROR: ", err))
-			return
-        }
-    }
-    if err := rows.Err(); err != nil {
-        _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: ERROR: ", err))
+        _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Error inserting to postgres: ", err))
 		return
     }
 
@@ -1425,22 +1412,9 @@ func (fes *APIServer) AddToCollection(ww http.ResponseWriter, req *http.Request)
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
 
 	// Query
-	rows, err := connection.Query(context.Background(), queryString)
+	_, err := connection.Exec(context.Background(), queryString)
 	if err != nil {
-        _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: Error connecting to postgres: ", err))
-		return
-    }
-
-    for rows.Next() {
-		s := ""
-        if err := rows.Scan(&s); 
-		err != nil {
-            _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: ERROR: ", err))
-			return
-        }
-    }
-    if err := rows.Err(); err != nil {
-        _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: ERROR: ", err))
+        _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: Error executing insert to postgres: ", err))
 		return
     }
 
