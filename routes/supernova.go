@@ -1408,7 +1408,7 @@ func (fes *APIServer) AddToCollection(ww http.ResponseWriter, req *http.Request)
 	
 	selectString := fmt.Sprintf(`SELECT DISTINCT ON (pg_posts.post_hash) pg_posts.post_hash, '%v', '%v', collection_description, banner_location, 
 	pp_location FROM pg_posts INNER JOIN pg_sn_collections ON collection = '%v' AND creator_name = '%v' 
-	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, username, collectionName, hexArrayPGFormat)
+	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, collectioName, username, hexArrayPGFormat)
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
 
 	// Query
