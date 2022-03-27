@@ -243,8 +243,8 @@ const (
 	RoutePathAdminResetTutorialStatus    = "/api/v0/admin/reset-tutorial-status"
 	RoutePathAdminGetTutorialCreators    = "/api/v0/admin/get-tutorial-creators"
 
-	// Custom Supernovas
-	RoutePathGetNFTShowcaseSupernovas = "/api/v0/get-nft-showcase-supernovas"
+	// Nonce, we need a nonce to validate the inline scripts, twitter, fb and gtag
+	RoutePathGetBase64Nonce = "/api/v0/get-base64-nonce"
 	// Supernovas Collections
 	RoutePathCreateCollection = "/api/v0/create-collection"
 	RoutePathSortCollection = "/api/v0/sort-collection"
@@ -804,10 +804,10 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 		},
 		// Supernovas
 		{
-			"GetNFTShowcaseSupernovas",
-			[]string{"POST", "OPTIONS"},
-			RoutePathGetNFTShowcaseSupernovas,
-			fes.GetNFTShowcasePlus,
+			"GetBase64Nonce",
+			[]string{"GET"},
+			RoutePathGetBase64Nonce,
+			fes.GetBase64Nonce,
 			PublicAccess,
 		},
 		{
