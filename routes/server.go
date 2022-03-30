@@ -271,6 +271,8 @@ const (
 	RoutePathGetTopEarningCollectors = "/api/v0/get-top-earning-collectors"
 	RoutePathGetTopEarningCreators = "/api/v0/get-top-earning-creators"
 	RoutePathGetQuickFacts = "/api/v0/get-quick-facts"
+	// Supernovas profile created
+	RoutePathGetCreatedNFTs = "/api/v0/get-created-nfts"
 
 	// PG verified list
 	RoutePathInsertIntoPGVerified = "/api/v0/insert-into-pg-verified"
@@ -952,6 +954,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetQuickFacts,
 			fes.GetQuickFacts,
+			PublicAccess,
+		},
+		{
+			"GetCreatedNFTs",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetCreatedNFTs,
+			fes.GetCreatedNFTs,
 			PublicAccess,
 		},
 		{
