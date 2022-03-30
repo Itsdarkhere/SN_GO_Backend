@@ -299,10 +299,6 @@ const (
 	RoutePathSendWonNFTEmail = "/api/v0/send-won-nft-email"
 	RoutePathSendBidPlacedEmail = "/api/v0/send-bid-placed-email"
 
-
-	// Adding to marketplace straight from minting
-	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
-	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
 	// expose_global_state.go
 	RoutePathGetVerifiedUsernames     = "/api/v0/get-verified-usernames"
 	RoutePathGetBlacklistedPublicKeys = "/api/v0/get-blacklisted-public-keys"
@@ -1125,20 +1121,6 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetSecondaryListings,
 			fes.GetSecondaryListings,
-			PublicAccess,
-		},
-		{
-			"GetMarketplaceRef",
-			[]string{"POST", "OPTIONS"},
-			RoutePathGetMarketplaceRefSupernovas,
-			fes.GetMarketplaceRef,
-			PublicAccess,
-		},
-		{
-			"AddToMarketplace",
-			[]string{"POST", "OPTIONS"},
-			RoutePathAddToMarketplaceSupernovas,
-			fes.AddToMarketplace,
 			PublicAccess,
 		},
 		// No longer Supernovas

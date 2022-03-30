@@ -1,8 +1,6 @@
 package routes
 
-import (	
-	"bytes"
-	"encoding/gob"
+import (
 	"encoding/json"
 	"fmt"
 	"io"
@@ -2962,7 +2960,7 @@ func (fes *APIServer) GetTrendingAuctions(ww http.ResponseWriter, req *http.Requ
 	defer conn.Release();
 
 	// Minus one week in Nanos
-    timeUnix := uint64(time.Now().UnixNano()) - 259200000000000
+    timeUnix := uint64(time.Now().UnixNano()) - 500000000000000
 
 	rows, err := conn.Query(context.Background(),
 	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
