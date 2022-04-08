@@ -1862,7 +1862,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	if requestData.ReaderPublicKeyBase58Check != "" {
 		readerPublicKeyBytes, _, errr = lib.Base58CheckDecode(requestData.ReaderPublicKeyBase58Check)
 		if errr != nil {
-			_AddBadRequestError(ww, fmt.Sprintf("GetNFTShowcase: Problem decoding reader public key: %v", errr))
+			_AddBadRequestError(ww, fmt.Sprintf("SortMarketplace: Problem decoding reader public key: %v", errr))
 			return
 		}
 	}

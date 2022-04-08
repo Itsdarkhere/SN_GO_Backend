@@ -292,15 +292,12 @@ const (
 	RoutePathGetSecondaryListings = "/api/v0/get-secondary-listings"
 
 	// Supernovas emails
-	RoutePathSendVerifyEmailEmail = "/api/v0/send-verify-email-email"
-	RoutePathSendLostNFTEmail = "/api/v0/send-lost-nft-email"
-	RoutePathSendNewBidEmail = "/api/v0/send-new-bid-email"
-	RoutePathSendInactiveUserEmail = "/api/v0/send-inactive-user-email"
 	RoutePathSendWelcomeEmail = "/api/v0/send-welcome-email"
-	RoutePathSendBidAgainEmail = "/api/v0/send-bid-again-email"
-	RoutePathSendWonNFTEmail = "/api/v0/send-won-nft-email"
-	RoutePathSendBidPlacedEmail = "/api/v0/send-bid-placed-email"
+	RoutePathReportPostEmail = "/api/v0/report-post-email"
 
+	// Adding to marketplace straight from minting
+	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
+	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
 	// expose_global_state.go
 	RoutePathGetVerifiedUsernames     = "/api/v0/get-verified-usernames"
 	RoutePathGetBlacklistedPublicKeys = "/api/v0/get-blacklisted-public-keys"
@@ -857,6 +854,22 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			fes.SortETHMarketplace,
 			PublicAccess,
 		},
+		// Send welcome email
+		{
+			"RoutePathSendWelcomeEmail",
+			[]string{"POST", "OPTIONS"},
+			RoutePathSendWelcomeEmail,
+			fes.SendWelcomeEmail,
+			PublicAccess,
+		},
+		// Report post
+		{
+			"RoutePathReportPostEmail",
+			[]string{"POST", "OPTIONS"},
+			RoutePathReportPostEmail,
+			fes.ReportPostEmail,
+			PublicAccess,
+		},
 		{
 			"GetPGProfileDetails",
 			[]string{"POST", "OPTIONS"},
@@ -1038,63 +1051,6 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathGetCommunityFavourites,
 			fes.GetCommunityFavourites,
-			PublicAccess,
-		},
-		// Supernovas Email Service
-		{
-			"SendVerifyEmailEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendVerifyEmailEmail,
-			fes.SendVerifyEmailEmail,
-			PublicAccess,
-		},
-		{
-			"SendLostNFTEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendLostNFTEmail,
-			fes.SendLostNFTEmail,
-			PublicAccess,
-		},
-		{
-			"SendNewBidEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendNewBidEmail,
-			fes.SendNewBidEmail,
-			PublicAccess,
-		},
-		{
-			"SendInactiveUserEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendInactiveUserEmail,
-			fes.SendInactiveUserEmail,
-			PublicAccess,
-		},
-		{
-			"SendWelcomeEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendWelcomeEmail,
-			fes.SendWelcomeEmail,
-			PublicAccess,
-		},
-		{
-			"SendBidAgainEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendBidAgainEmail,
-			fes.SendBidAgainEmail,
-			PublicAccess,
-		},
-		{
-			"SendWonNFTEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendWonNFTEmail,
-			fes.SendWonNFTEmail,
-			PublicAccess,
-		},
-		{
-			"SendBidPlacedEmail",
-			[]string{"POST", "OPTIONS"},
-			RoutePathSendBidPlacedEmail,
-			fes.SendBidPlacedEmail,
 			PublicAccess,
 		},
 		{
