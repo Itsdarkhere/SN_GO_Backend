@@ -3136,8 +3136,6 @@ func (fes *APIServer) GetCreatedNFTs(ww http.ResponseWriter, req *http.Request) 
 	// Release connection once function returns
 	defer conn.Release();
 
-	// Minus one week in Nanos
-    timeUnix := uint64(time.Now().UnixNano()) - 259200000000000
 
 	rows, err := conn.Query(context.Background(),
 	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
@@ -3197,6 +3195,9 @@ func (fes *APIServer) GetCreatedNFTs(ww http.ResponseWriter, req *http.Request) 
 			}
 			if post.PostExtraData["arweaveModelSrc"] != "" {
 				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
+			if post.PostExtraData["isEthereumNFT"] != "" {
+				post.PostExtraData["isEthereumNFT"] = base64Decode(post.PostExtraData["isEthereumNFT"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)
