@@ -1895,7 +1895,8 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	basic_inner_join := ""
 
 	basic_where := ` WHERE hidden = false AND nft = true 
-	AND num_nft_copies != num_nft_copies_burned`
+	AND num_nft_copies != num_nft_copies_burned AND encode(poster_public_key, 'base64') NOT IN 
+	('Ar4Tz7xvBc2L9MJjENFxdIY1FrvzFMYVlLXr0wrimbvO', 'A0/Pe/Ksu3N17ZaGrEki7jfHRr44SRXU6CIzTXc8f/z+')`
 
 	basic_group_by := " GROUP BY post_hash"
 
@@ -2809,7 +2810,9 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
-	WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true 
+	WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true
+	AND encode(poster_public_key, 'base64') NOT IN 
+	('Ar4Tz7xvBc2L9MJjENFxdIY1FrvzFMYVlLXr0wrimbvO', 'A0/Pe/Ksu3N17ZaGrEki7jfHRr44SRXU6CIzTXc8f/z+')
 	AND num_nft_copies != num_nft_copies_burned
 	ORDER BY timestamp desc LIMIT 8`)
 	if err != nil {
