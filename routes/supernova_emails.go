@@ -65,6 +65,45 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 		return
 	}
 }
+
+type AddToInvestorEmailListRequest struct {
+	Email string 
+}
+// Adds person to investors info emails list
+func (fes *APIServer) AddToInvestorEmailList(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	// Check Request 
+	requestData := AddToInvestorEmailListRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToInvestorEmailList: Error parsing request body: %v", err))
+		return
+	}
+
+	if requestData.Email == "" {
+		_AddBadRequestError(ww, fmt.Sprintf("AddToInvestorEmailList: Error no Email sent in request"))
+		return
+	}
+
+	host := "https://api.sendgrid.com"
+    request := sendgrid.GetRequest("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", "/v3/marketing/contacts", host)
+    request.Method = "PUT"
+    request.Body = []byte(fmt.Sprintf(`{
+		"contacts": [
+			{
+			"email": "%v"
+			}
+		],
+		"list_ids": [
+			"f7664252-5394-48b6-86cd-af1a683d928d"
+		]
+		}`, requestData.Email))
+
+    response, err := sendgrid.API(request)
+    if err = json.NewEncoder(ww).Encode("Success"); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("AddToInvestorEmailList: Problem serializing object to JSON: %v", err))
+		return
+	}
+}
 type ReportPostEmailRequest struct {
 	ReportedContent string `json:"ReportedContent"`
 }

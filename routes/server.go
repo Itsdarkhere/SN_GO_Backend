@@ -294,6 +294,7 @@ const (
 	// Supernovas emails
 	RoutePathSendWelcomeEmail = "/api/v0/send-welcome-email"
 	RoutePathReportPostEmail = "/api/v0/report-post-email"
+	RoutePathAddToInvestorEmailList = "/api/v0/add-to-investor-email-list"
 
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
@@ -868,6 +869,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathReportPostEmail,
 			fes.ReportPostEmail,
+			PublicAccess,
+		},
+		{
+			"RoutePathAddToInvestorEmailList",
+			[]string{"POST", "OPTIONS"},
+			RoutePathAddToInvestorEmailList,
+			fes.AddToInvestorEmailList,
 			PublicAccess,
 		},
 		{
