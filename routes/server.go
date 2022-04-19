@@ -296,6 +296,9 @@ const (
 	RoutePathReportPostEmail = "/api/v0/report-post-email"
 	RoutePathAddToInvestorEmailList = "/api/v0/add-to-investor-email-list"
 
+	// Get current time for dao page
+	RoutePathGetTimeNow = "/api/v0/get-time-now-presale"
+
 	// Adding to marketplace straight from minting
 	RoutePathGetMarketplaceRefSupernovas    = "/api/v0/get-marketplace-ref-supernovas"
 	RoutePathAddToMarketplaceSupernovas 	= "/api/v0/add-to-marketplace-supernovas"
@@ -876,6 +879,13 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			[]string{"POST", "OPTIONS"},
 			RoutePathAddToInvestorEmailList,
 			fes.AddToInvestorEmailList,
+			PublicAccess,
+		},
+		{
+			"RoutePathGetTimeNow",
+			[]string{"POST", "OPTIONS"},
+			RoutePathGetTimeNow,
+			fes.GetTimeNow,
 			PublicAccess,
 		},
 		{

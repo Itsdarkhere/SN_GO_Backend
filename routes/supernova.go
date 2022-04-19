@@ -2770,6 +2770,24 @@ func (fes *APIServer) GetCommunityFavourites(ww http.ResponseWriter, req *http.R
 		conn.Release();
 	}
 }
+// Asks for ReaderPublicKey, but does not need it.
+func (fes *APIServer) GetTimeNow(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := GetNFTShowcaseRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("GetTimeNow: Error parsing request body: %v", err))
+		return
+	}
+	// Get server time so its same for all users
+	timeUnix := uint64(time.Now())
+
+	// Serialize response to JSON
+	if err = json.NewEncoder(ww).Encode(timeUnix); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetTimeNow: Problem serializing object to JSON: %v", err))
+		return
+	}
+}
+// timeUnix := uint64(time.Now().UnixNano())
 func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
 	requestData := GetNFTShowcaseRequest{}
