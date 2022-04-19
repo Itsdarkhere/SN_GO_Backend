@@ -98,7 +98,7 @@ func (fes *APIServer) AddToInvestorEmailList(ww http.ResponseWriter, req *http.R
 		]
 		}`, requestData.Email))
 
-    response, err := sendgrid.API(request)
+    _, err := sendgrid.API(request)
     if err = json.NewEncoder(ww).Encode("Success"); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("AddToInvestorEmailList: Problem serializing object to JSON: %v", err))
 		return
