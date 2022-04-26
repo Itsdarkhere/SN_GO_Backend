@@ -2777,11 +2777,11 @@ func (fes *APIServer) GetTimeNow(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Get server time so its same for all users
-	timeUnix := uint64(time.Now())
+	timeUnix := uint64(time.Now().Unix())
 
 	// Serialize response to JSON
-	if err = json.NewEncoder(ww).Encode(timeUnix); err != nil {
-		_AddInternalServerError(ww, fmt.Sprintf("GetTimeNow: Problem serializing object to JSON: %v", err))
+	if err := json.NewEncoder(ww).Encode(timeUnix); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetTimeNow: Problem serializing object to JSON"))
 		return
 	}
 }
