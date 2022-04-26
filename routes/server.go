@@ -280,6 +280,8 @@ const (
 	RoutePathGetPGProfileDetails = "/api/v0/get-pg-profile-details"
 	RoutePathUpdateCollectorOrCreator = "/api/v0/update-collector-or-creator"
 	RoutePathGetCollectorOrCreator = "/api/v0/get-collector-or-creator"
+	// PG blocked list
+	RoutePathRemoveUserFromQueries = "/api/v0/remove-user-from-queries"
 	// Marketplace
 	RoutePathSortMarketplace = "/api/v0/sort-marketplace"
 	RoutePathSortCreators = "/api/v0/sort-creators"
@@ -901,6 +903,14 @@ func (fes *APIServer) NewRouter() *muxtrace.Router {
 			RoutePathUpdateCollectorOrCreator,
 			fes.UpdateCollectorOrCreator,
 			PublicAccess,
+		},
+		// RoutePathRemoveUserFromQueries
+		{
+			"RemoveUserFromQueries",
+			[]string{"POST", "OPTIONS"},
+			RoutePathRemoveUserFromQueries,
+			fes.RemoveUserFromQueries,
+			AdminAccess,
 		},
 		{
 			"GetCollectorOrCreator",
