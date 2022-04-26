@@ -724,6 +724,61 @@ func (fes *APIServer) InsertIMXMetadata(ww http.ResponseWriter, req *http.Reques
 	conn.Release();
 
 }
+type RemoveUserFromQueriesRequest struct {
+	AdminPublicKey string
+	Base64PublicKey string
+}
+func (fes *APIServer) RemoveUserFromQueries(ww http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
+	requestData := RemoveUserFromQueriesRequest{}
+	if err := decoder.Decode(&requestData); err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("RemoveUserFromQueries: Error parsing request body: %v", err))
+		return
+	}
+	if requestData.Base64PublicKey == "" {
+		_AddInternalServerError(ww, fmt.Sprintf("RemoveUserFromQueries: No Base64PublicKey sent in request"))
+		return
+	}
+
+	// Get connection pool
+	dbPool, err := CustomConnect()
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("RemoveUserFromQueries: Error getting pool: %v", err))
+		return
+	}
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("RemoveUserFromQueries: Error cant connect to database: %v", err))
+		conn.Release()
+		return
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+
+	queryString := fmt.Sprintf(`INSERT INTO pg_blocked (b64_pk) VALUES ('%v')`, requestData.Base64PublicKey)
+	// Query
+	_, err = conn.Exec(context.Background(), queryString)
+	if err != nil {
+		_AddBadRequestError(ww, fmt.Sprintf("RemoveUserFromQueries: Error Inserting to blocked list: %v", err))
+		return
+	}
+
+	resp := CreateCollectionResponse { 
+		Response: "Success",
+	}
+
+	if err = json.NewEncoder(ww).Encode(resp); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("RemoveUserFromQueries: Problem serializing object to JSON: %v", err))
+		return
+	}
+
+	// Just to make sure call it here too, calling it multiple times has no side-effects
+	conn.Release();
+
+}
+
 type GetIMXMetadataByIdResponse struct {
 	Name string `db:"name"`
 	Description string `db:"description"`
@@ -1895,8 +1950,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	basic_inner_join := ""
 
 	basic_where := ` WHERE hidden = false AND nft = true 
-	AND num_nft_copies != num_nft_copies_burned AND encode(poster_public_key, 'base64') NOT IN 
-	('Ar4Tz7xvBc2L9MJjENFxdIY1FrvzFMYVlLXr0wrimbvO', 'AlZxByZzzwVhD8lBUelP9mohhu4aFPgBcbiw/Pcdc8LX')`
+	AND num_nft_copies != num_nft_copies_burned AND encode(poster_public_key, 'base64') NOT IN (SELECT b64_pk FROM pg_blocked)`
 
 	basic_group_by := " GROUP BY post_hash"
 
@@ -2829,8 +2883,7 @@ func (fes *APIServer) GetFreshDrops(ww http.ResponseWriter, req *http.Request) {
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
 	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
 	WHERE extra_data->>'Node' = 'OQ==' AND hidden = false AND nft = true
-	AND encode(poster_public_key, 'base64') NOT IN 
-	('Ar4Tz7xvBc2L9MJjENFxdIY1FrvzFMYVlLXr0wrimbvO', 'AlZxByZzzwVhD8lBUelP9mohhu4aFPgBcbiw/Pcdc8LX')
+	AND encode(poster_public_key, 'base64') NOT IN (SELECT b64_pk FROM pg_blocked)
 	AND num_nft_copies != num_nft_copies_burned
 	ORDER BY timestamp desc LIMIT 8`)
 	if err != nil {
