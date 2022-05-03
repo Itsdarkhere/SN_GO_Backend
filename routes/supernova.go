@@ -1888,6 +1888,7 @@ type SortMarketplaceRequest struct {
 	SortType string `safeForLogging:"true"`
 	ContentFormat string `safeForLogging:"true"`
 	CreatorsType string `safeForLogging:"true"`
+	Limit uint64 
 }
 
 func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request) {
@@ -1958,7 +1959,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 
 	basic_offset := fmt.Sprintf(" OFFSET %v", offset)
 
-	basic_limit := ` LIMIT 30`
+	basic_limit := fmt.Sprintf(` LIMIT %v`, requestData.Limit)
 
 	basic_order_by := " ORDER BY"
 
