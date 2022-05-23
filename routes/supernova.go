@@ -202,12 +202,7 @@ func (fes *APIServer) InsertIntoCollection(ww http.ResponseWriter, req *http.Req
 
 	queryString := fmt.Sprintf(`
 	INSERT INTO pg_sn_collections(collection, creator_name, collection_description, banner_location, pp_location, post_hash)
-	SELECT collection, creator_name, collection_description, banner_location, pp_location,
-	(
-		SELECT post_hash FROM pg_posts
-		WHERE encode(pg_posts.post_hash, 'hex') = '%v'
-		LIMIT 1
-	) as post_hash
+	SELECT collection, creator_name, collection_description, banner_location, pp_location, '%v'
 	FROM pg_sn_collections
 	WHERE creator_name = '%v' AND collection = '%v'
 	LIMIT 1;
@@ -354,7 +349,7 @@ func (fes *APIServer) GetAllUserCollections(ww http.ResponseWriter, req *http.Re
 			SELECT COALESCE(MIN(min_bid_amount_nanos), -1)
 			FROM pg_sn_collections AS b
 			INNER JOIN pg_nfts 
-			ON b.post_hash = pg_nfts.nft_post_hash
+			ON b.post_hash = encode(pg_nfts.nft_post_hash, 'hex')
 			WHERE for_sale = true and b.collection = c.collection
 	) AS floor_price, 
 	(
@@ -463,7 +458,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		SELECT COALESCE(SUM(bid_amount_nanos), 0)
 		FROM pg_sn_collections
 		INNER JOIN pg_metadata_accept_nft_bids
-		ON pg_sn_collections.post_hash = pg_metadata_accept_nft_bids.nft_post_hash
+		ON pg_sn_collections.post_hash = encode(pg_metadata_accept_nft_bids.nft_post_hash, 'hex')
 		WHERE collection = '%v' AND creator_name = '%v'
 	) as trading_volume,`, collectionName, collectionCreatorName)
 
@@ -473,7 +468,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		SELECT COALESCE(MIN(min_bid_amount_nanos), -1)
 		FROM pg_sn_collections
 		INNER JOIN pg_nfts 
-		ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
+		ON pg_sn_collections.post_hash = encode(pg_nfts.nft_post_hash, 'hex')
 		WHERE collection = '%v' AND creator_name = '%v' AND for_sale = true
 	) as floor_price,`, collectionName, collectionCreatorName)
 	
@@ -483,7 +478,7 @@ func (fes *APIServer) GetCollectionInfo(ww http.ResponseWriter, req *http.Reques
 		SELECT COUNT(DISTINCT owner_pkid)
 		FROM pg_sn_collections
 		INNER JOIN pg_nfts
-		ON pg_sn_collections.post_hash = pg_nfts.nft_post_hash
+		ON pg_sn_collections.post_hash = encode(pg_nfts.nft_post_hash, 'hex')
 		WHERE collection = '%v' AND creator_name = '%v'
 	) as owners_amount `, collectionName, collectionCreatorName)
 
@@ -887,7 +882,7 @@ func (fes *APIServer) GetUserCollectionsData(ww http.ResponseWriter, req *http.R
 
 	// Query
 	rows, err := conn.Query(context.Background(), 
-	fmt.Sprintf("SELECT encode(post_hash, 'hex') as post_hash, collection FROM pg_sn_collections WHERE creator_name = '%v'", requestData.Username))
+	fmt.Sprintf("SELECT post_hash, collection FROM pg_sn_collections WHERE creator_name = '%v'", requestData.Username))
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("GetUserCollectionsData: Error query failed: %v", err))
 		return
@@ -1333,17 +1328,7 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 		_AddInternalServerError(ww, fmt.Sprintf("CreateCollection: No postHashHex sent in request"))
 		return
 	}
-	hexArray := requestData.PostHashHexArray
-	hexArrayPGFormat := "("
-	// Loop through array and construct a string to use in insert
-	for i := 0; i < len(hexArray); i++ {
-		if (i + 1 == len(hexArray)) {
-			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "'"
-		} else {
-			hexArrayPGFormat = hexArrayPGFormat + "'" + hexArray[i] + "',"
-		}
-	}
-	hexArrayPGFormat = hexArrayPGFormat + ")"
+
 	if requestData.Username == "" {
 		_AddInternalServerError(ww, fmt.Sprintf("CreateCollection: No Username sent in request"))
 		return
@@ -1373,6 +1358,17 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	}
 	collectionProfilePicLocation := requestData.CollectionProfilePicLocation
 
+	hexArray := requestData.PostHashHexArray
+	valuesString := ""
+	// Loop through array and construct a string to use in insert
+	for i := 0; i < len(hexArray); i++ {
+		if (i + 1 == len(hexArray)) {
+			valuesString = "(" + valuesString + "'" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "'), "
+		} else {
+			valuesString = "(" + valuesString + "'" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "')"
+		}
+	}
+
 	conn, err := CustomConnect();
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("CreateCollection: Error getting pool: %v", err))
@@ -1383,9 +1379,7 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 		fmt.Println("CreateCollection: ERROR WITH POSTGRES CONNECTION")
 	}
 	
-	selectString := fmt.Sprintf(`SELECT post_hash,'%v', '%v', '%v', '%v', '%v' FROM pg_posts 
-	WHERE encode(post_hash, 'hex') IN %v`, username, collectionName, collectionDescription, collectionBannerLocation, collectionProfilePicLocation, hexArrayPGFormat)
-	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
+	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) VALUES ` + valueString 
 
 	// Query
 	_, err := connection.Exec(context.Background(), queryString)
