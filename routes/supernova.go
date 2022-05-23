@@ -1008,7 +1008,7 @@ func (fes *APIServer) SortCollection(ww http.ResponseWriter, req *http.Request) 
 
 	basic_from := ` FROM pg_sn_collections`
 
-	basic_inner_join := " INNER JOIN pg_posts ON pg_sn_collections.post_hash = pg_posts.post_hash"
+	basic_inner_join := " INNER JOIN pg_posts ON pg_sn_collections.post_hash = encode(pg_posts.post_hash, 'hex')"
 
 	basic_where := fmt.Sprintf(` WHERE nft = true AND num_nft_copies != num_nft_copies_burned AND creator_name = '%v' AND collection = '%v'`, username, collectionName)
 
