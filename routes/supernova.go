@@ -1356,35 +1356,48 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	}
 	collectionProfilePicLocation := requestData.CollectionProfilePicLocation
 
+	rows := [][]interface{}{}
+
 	hexArray := requestData.PostHashHexArray
-	valuesString := ""
 	// Loop through array and construct a string to use in insert
 	for i := 0; i < len(hexArray); i++ {
-		if (i + 1 == len(hexArray)) {
-			valuesString = valuesString + fmt.Sprintf("('%v', '%v', '%v', '%v', '%v', '%v'),", hexArray[i], username, collectionName, collectionDescription, collectionBannerLocation, collectionProfilePicLocation)
-		} else {
-			valuesString = valuesString + fmt.Sprintf("('%v', '%v', '%v', '%v', '%v', '%v');", hexArray[i], username, collectionName, collectionDescription, collectionBannerLocation, collectionProfilePicLocation)
-		}
+		temp := [][]interface{}{{hexArray[i], username, collectionName, collectionDescription, collectionBannerLocation, collectionProfilePicLocation}}
+		rows = append(rows, temp...)
 	}
 
-	conn, err := CustomConnect();
+	// Get connection pool
+	dbPool, err := CustomConnect()
 	if err != nil {
 		_AddBadRequestError(ww, fmt.Sprintf("CreateCollection: Error getting pool: %v", err))
 		return
 	}
-	connection, err := conn.Acquire(context.Background())
+	// get connection to pool
+	conn, err := dbPool.Acquire(context.Background())
 	if err != nil {
-		fmt.Println("CreateCollection: ERROR WITH POSTGRES CONNECTION")
-	}
-	
-	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) VALUES ` + valueString 
-
-	// Query
-	_, err = connection.Exec(context.Background(), queryString)
-	if err != nil {
-        _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Error inserting to postgres: ", err))
+		_AddBadRequestError(ww, fmt.Sprintf("CreateCollection: Error cant connect to database: %v", err))
+		conn.Release()
 		return
-    }
+	}
+
+	// Release connection once function returns
+	defer conn.Release();
+	
+	copyCount, err := conn.CopyFrom(
+	 	context.Background(),
+	 	pgx.Identifier{"pg_sn_collections"},
+	 	[]string{"post_hash", "creator_name", "collection", "collection_description", "banner_location", "pp_location"},
+	 	pgx.CopyFromRows(rows),
+	)
+
+	if err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Error in copyFrom:", err))
+		return
+	}
+
+	if copyCount == 0 {
+		_AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Failed to add nfts to collection..."))
+		return
+	}
 
 	resp := CreateCollectionResponse { 
 		Response: "Success",
@@ -1396,7 +1409,7 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	}
 
 	// Just to make sure call it here too, calling it multiple times has no side-effects
-	connection.Release();
+	conn.Release();
 
 }
 type AddToCollectionResponse struct {
