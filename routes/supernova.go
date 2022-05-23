@@ -1,8 +1,6 @@
 package routes
 
-import (	
-	"bytes"
-	"encoding/gob"
+import (
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1382,7 +1380,7 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) VALUES ` + valueString 
 
 	// Query
-	_, err := connection.Exec(context.Background(), queryString)
+	_, err = connection.Exec(context.Background(), queryString)
 	if err != nil {
         _AddInternalServerError(ww, fmt.Sprintf("CreateCollection: Error inserting to postgres: ", err))
 		return
@@ -1457,11 +1455,11 @@ func (fes *APIServer) AddToCollection(ww http.ResponseWriter, req *http.Request)
 	
 	selectString := fmt.Sprintf(`SELECT DISTINCT ON (pg_posts.post_hash) pg_posts.post_hash, '%v', '%v', collection_description, banner_location, 
 	pp_location FROM pg_posts INNER JOIN pg_sn_collections ON collection = '%v' AND creator_name = '%v' 
-	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, collectioName, username, hexArrayPGFormat)
+	WHERE encode(pg_posts.post_hash, 'hex') IN %v`, username, collectionName, collectionName, username, hexArrayPGFormat)
 	queryString := `INSERT INTO pg_sn_collections (post_hash, creator_name, collection, collection_description, banner_location, pp_location) ` + selectString 
 
 	// Query
-	_, err := connection.Exec(context.Background(), queryString)
+	_, err = connection.Exec(context.Background(), queryString)
 	if err != nil {
         _AddInternalServerError(ww, fmt.Sprintf("AddToCollection: Error executing insert to postgres: ", err))
 		return
@@ -2304,7 +2302,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	}
 }
 type SortETHMarketplaceRequest struct {
-	ReaderPublicKeyBytes string 
+	ReaderPublicKeyBase58Check string 
 	TokenIdArray []string 
 	Category string 
 	SortType string 
@@ -2430,7 +2428,7 @@ func (fes *APIServer) SortETHMarketplace(ww http.ResponseWriter, req *http.Reque
 	}
 
 	// Concat the superstring 
-	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_group_by + basic_order_by + basic_offset + basic_limit
+	queryString := basic_select + basic_from + basic_inner_join + basic_where + basic_group_by + basic_order_by + basic_limit
 
 	// Query
 	rows, err := conn.Query(context.Background(), queryString)
@@ -2828,11 +2826,11 @@ func (fes *APIServer) GetTimeNow(ww http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Get server time so its same for all users
-	timeUnix := uint64(time.Now().timeUnix)
+	timeUnix := uint64(time.Now().Unix())
 
 	// Serialize response to JSON
-	if err = json.NewEncoder(ww).Encode(timeUnix); err != nil {
-		_AddInternalServerError(ww, fmt.Sprintf("GetTimeNow: Problem serializing object to JSON: %v", err))
+	if err := json.NewEncoder(ww).Encode(timeUnix); err != nil {
+		_AddInternalServerError(ww, fmt.Sprintf("GetTimeNow: Problem serializing object to JSON"))
 		return
 	}
 }
@@ -3031,7 +3029,7 @@ func (fes *APIServer) GetTrendingAuctions(ww http.ResponseWriter, req *http.Requ
 	defer conn.Release();
 
 	// Minus one week in Nanos
-    timeUnix := uint64(time.Now().UnixNano()) - 259200000000000
+    timeUnix := uint64(time.Now().UnixNano()) - 500000000000000
 
 	rows, err := conn.Query(context.Background(),
 	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
@@ -3207,8 +3205,6 @@ func (fes *APIServer) GetCreatedNFTs(ww http.ResponseWriter, req *http.Request) 
 	// Release connection once function returns
 	defer conn.Release();
 
-	// Minus one week in Nanos
-    timeUnix := uint64(time.Now().UnixNano()) - 259200000000000
 
 	rows, err := conn.Query(context.Background(),
 	fmt.Sprintf(`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
@@ -3268,6 +3264,9 @@ func (fes *APIServer) GetCreatedNFTs(ww http.ResponseWriter, req *http.Request) 
 			}
 			if post.PostExtraData["arweaveModelSrc"] != "" {
 				post.PostExtraData["arweaveModelSrc"] = base64Decode(post.PostExtraData["arweaveModelSrc"])
+			}
+			if post.PostExtraData["isEthereumNFT"] != "" {
+				post.PostExtraData["isEthereumNFT"] = base64Decode(post.PostExtraData["isEthereumNFT"])
 			}
 			// Now break down the faulty body into a few parts
 			content := JsonToStruct(body.Body)

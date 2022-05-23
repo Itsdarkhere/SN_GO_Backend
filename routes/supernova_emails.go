@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"io"
@@ -60,7 +59,7 @@ func (fes *APIServer) SendWelcomeEmail(ww http.ResponseWriter, req *http.Request
 	request.Method = "POST"
 	var Body = mail.GetRequestBody(m)
 	request.Body = Body
-	response, err := sendgrid.API(request)
+	_, err := sendgrid.API(request)
 	if err = json.NewEncoder(ww).Encode("Success"); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("SendWelcomeEmail: Error sending email: %v", err))
 		return
@@ -99,7 +98,7 @@ func (fes *APIServer) AddToInvestorEmailList(ww http.ResponseWriter, req *http.R
 		]
 		}`, requestData.Email))
 
-    response, err := sendgrid.API(request)
+    _, err := sendgrid.API(request)
     if err = json.NewEncoder(ww).Encode("Success"); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("AddToInvestorEmailList: Problem serializing object to JSON: %v", err))
 		return
@@ -131,7 +130,7 @@ func (fes *APIServer) ReportPostEmail(ww http.ResponseWriter, req *http.Request)
 	htmlContent := link
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 	client := sendgrid.NewSendClient("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")
-	response, err := client.Send(message)
+	_, err := client.Send(message)
 
 	if err = json.NewEncoder(ww).Encode("Success"); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("ReportPostEmail: Problem serializing object to JSON: %v", err))
