@@ -1361,9 +1361,9 @@ func (fes *APIServer) CreateCollection(ww http.ResponseWriter, req *http.Request
 	// Loop through array and construct a string to use in insert
 	for i := 0; i < len(hexArray); i++ {
 		if (i + 1 == len(hexArray)) {
-			valuesString = "(" + valuesString + "'" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "'), "
+			valuesString = valuesString + "('" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "'), "
 		} else {
-			valuesString = "(" + valuesString + "'" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "')"
+			valuesString = valuesString + "('" + hexArray[i] + "', '" + username + "', '" + collectionName + "', '" + collectionDescription + "', '" + collectionBannerLocation + "', '" + collectionProfilePicLocation + "')"
 		}
 	}
 
