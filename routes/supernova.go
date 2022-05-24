@@ -1952,7 +1952,7 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 	like_count, 
 	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data`
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, pg_posts.extra_data`
 
 	basic_from := ` FROM pg_posts`
 
@@ -2046,19 +2046,19 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "all":
 			// Do nothing
 		case "photography":
-			basic_where = basic_where + " AND extra_data->>'category' = 'UGhvdG9ncmFwaHk='"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'UGhvdG9ncmFwaHk='"
 		case "profile picture":
-			basic_where = basic_where + " AND extra_data->>'category' = 'UHJvZmlsZSBQaWN0dXJl'"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'UHJvZmlsZSBQaWN0dXJl'"
 		case "music":
-			basic_where = basic_where + " AND extra_data->>'category' = 'TXVzaWM='"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'TXVzaWM='"
 		case "metaverse":
-			basic_where = basic_where + " AND extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n'"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'TWV0YXZlcnNlICYgR2FtaW5n'"
 		case "art":
-			basic_where = basic_where + " AND extra_data->>'category' = 'QXJ0'"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'QXJ0'"
 		case "collectibles":
-			basic_where = basic_where + " AND extra_data->>'category' = 'Q29sbGVjdGlibGVz'"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'Q29sbGVjdGlibGVz'"
 		case "generative art":
-			basic_where = basic_where + " AND extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ='"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'category' = 'R2VuZXJhdGl2ZSBBcnQ='"
 		default:
 			_AddBadRequestError(ww, "SortMarketplace: Error in category switch")
 			return
@@ -2125,13 +2125,13 @@ func (fes *APIServer) SortMarketplace(ww http.ResponseWriter, req *http.Request)
 		case "all":
 		// Do nothing
 		case "images":
-			basic_where = basic_where + " AND body::json->>'ImageURLs' <> '[]' IS TRUE AND extra_data->>'arweaveAudioSrc' IS NULL"
+			basic_where = basic_where + " AND body::json->>'ImageURLs' <> '[]' IS TRUE AND pg_posts.extra_data->>'arweaveAudioSrc' IS NULL"
 		case "video":
-			basic_where = basic_where + " AND (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
+			basic_where = basic_where + " AND (pg_posts.extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "music":
-			basic_where = basic_where + " AND extra_data->>'arweaveAudioSrc' != ''"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'arweaveAudioSrc' != ''"
 		case "3d":
-			basic_where = basic_where + " AND extra_data->>'arweaveModelSrc' != ''"
+			basic_where = basic_where + " AND pg_posts.extra_data->>'arweaveModelSrc' != ''"
 		/*case "images video":
 			basic_where = basic_where + " AND (body::json->>'ImageURLs' <> '[]' IS TRUE) OR (extra_data->>'arweaveVideoSrc' != '') OR (body::json->>'VideoURLs' != NULL)"
 		case "images music":
@@ -3383,7 +3383,7 @@ func (fes *APIServer) GetRecentSales(ww http.ResponseWriter, req *http.Request) 
 	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, pg_posts.extra_data FROM pg_posts
 	INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash
 	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale = 0 
 	AND num_nft_copies != num_nft_copies_burned AND last_accepted_bid_amount_nanos > 0
@@ -3540,7 +3540,7 @@ func (fes *APIServer) GetSecondaryListings(ww http.ResponseWriter, req *http.Req
 	`SELECT like_count, diamond_count, comment_count, encode(post_hash, 'hex') as post_hash, 
 	poster_public_key, body, timestamp, hidden, repost_count, quote_repost_count, 
 	pinned, nft, num_nft_copies, unlockable, creator_royalty_basis_points,
-	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, extra_data FROM pg_posts
+	coin_royalty_basis_points, num_nft_copies_for_sale, num_nft_copies_burned, pg_posts.extra_data FROM pg_posts
 	INNER JOIN pg_nfts ON pg_nfts.nft_post_hash = post_hash
 	WHERE hidden = false AND nft = true AND num_nft_copies_for_sale > 0 AND num_nft_copies = 1
 	AND num_nft_copies != num_nft_copies_burned AND owner_pkid != poster_public_key
