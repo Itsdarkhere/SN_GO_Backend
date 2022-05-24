@@ -112,7 +112,7 @@ func CustomConnect() (*pgxpool.Pool, error) {
 		return pool, nil
 	}
 
-	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-deso-db"
+	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@host.docker.internal:65432/supernovas-deso-db"
 	// host.docker.internal:65432
 	config, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
@@ -138,7 +138,7 @@ func CustomConnectETH() (*pgxpool.Pool, error) {
 		return poolETH, nil
 	}
 
-	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@65.108.105.40:65432/supernovas-data-db"
+	DATABASE_URL := "postgres://user_readonly:woebiuwecjlcasc283ryoih@host.docker.internal:65432/supernovas-data-db"
 	config, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
 		return nil, err
