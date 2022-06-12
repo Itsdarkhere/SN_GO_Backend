@@ -15,8 +15,8 @@ import (
 )
 
 type GetDAOCoinLimitOrdersRequest struct {
-	DAOCoin1CreatorPublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
-	DAOCoin2CreatorPublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
+	DAOCoin1CreatorPublicKeyBase58Check string `safeForLogging:"true"`
+	DAOCoin2CreatorPublicKeyBase58Check string `safeForLogging:"true"`
 }
 
 type GetDAOCoinLimitOrdersResponse struct {
@@ -29,13 +29,27 @@ type DAOCoinLimitOrderEntryResponse struct {
 	BuyingDAOCoinCreatorPublicKeyBase58Check  string `safeForLogging:"true"`
 	SellingDAOCoinCreatorPublicKeyBase58Check string `safeForLogging:"true"`
 
-	ExchangeRateCoinsToSellPerCoinToBuy float64 `safeForLogging:"true"`
-	QuantityToFill                      float64 `safeForLogging:"true"`
+	// A decimal string (ex: 1.23) that represents the exchange rate between the two coins. If operation type is BID
+	// then the denominator represents the coin being bought. If the operation type is ASK, then the denominator
+	// represents the coin being sold
+	Price string `safeForLogging:"true"`
+
+	// A decimal string (ex: 1.23) that represents the quantity of coins being bought or sold. If operation type is BID,
+	// then this quantity refers to the coin being bought. If operation type is ASK, then it refers to the coin being sold
+	Quantity string `safeForLogging:"true"`
+
+	// These two fields will be deprecated once the above Price and Quantity fields are deployed, and users have migrated
+	// to start using them. Until then, the API will continue to populate ExchangeRateCoinsToSellPerCoinToBuy and QuantityToFill
+	// in all responses
+	ExchangeRateCoinsToSellPerCoinToBuy float64 `safeForLogging:"true"` // Deprecated
+	QuantityToFill                      float64 `safeForLogging:"true"` // Deprecated
 
 	OperationType DAOCoinLimitOrderOperationTypeString
 
 	OrderID string
 }
+
+const DESOCoinIdentifierString = "DESO"
 
 func (fes *APIServer) GetDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(io.LimitReader(req.Body, MaxRequestBodySizeBytes))
@@ -48,12 +62,12 @@ func (fes *APIServer) GetDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Re
 		return
 	}
 
-	if requestData.DAOCoin1CreatorPublicKeyBase58CheckOrUsername == "" &&
-		requestData.DAOCoin2CreatorPublicKeyBase58CheckOrUsername == "" {
+	if requestData.DAOCoin1CreatorPublicKeyBase58Check == DESOCoinIdentifierString &&
+		requestData.DAOCoin2CreatorPublicKeyBase58Check == DESOCoinIdentifierString {
 		_AddBadRequestError(
 			ww,
 			fmt.Sprint("GetDAOCoinLimitOrders: Must provide either a "+
-				"DAOCoin1CreatorPublicKeyBase58CheckOrUsername or DAOCoin2CreatorPublicKeyBase58CheckOrUsername "+
+				"DAOCoin1CreatorPublicKeyBase58Check or DAOCoin2CreatorPublicKeyBase58Check "+
 				"or both"),
 		)
 		return
@@ -68,32 +82,29 @@ func (fes *APIServer) GetDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Re
 	coin1PKID := &lib.ZeroPKID
 	coin2PKID := &lib.ZeroPKID
 
-	coin1ProfilePublicBase58Check := ""
-	coin2ProfilePublicBase58Check := ""
-
-	if requestData.DAOCoin1CreatorPublicKeyBase58CheckOrUsername != "" {
-		coin1ProfilePublicBase58Check, coin1PKID, err = fes.getPublicKeyBase58CheckAndPKIDForPublicKeyBase58CheckOrUsername(
+	if requestData.DAOCoin1CreatorPublicKeyBase58Check != DESOCoinIdentifierString {
+		coin1PKID, err = fes.getPKIDFromPublicKeyBase58Check(
 			utxoView,
-			requestData.DAOCoin1CreatorPublicKeyBase58CheckOrUsername,
+			requestData.DAOCoin1CreatorPublicKeyBase58Check,
 		)
 		if err != nil {
 			_AddBadRequestError(
 				ww,
-				fmt.Sprintf("GetDAOCoinLimitOrders: Invalid DAOCoin1CreatorPublicKeyBase58CheckOrUsername: %v", err),
+				fmt.Sprintf("GetDAOCoinLimitOrders: Invalid DAOCoin1CreatorPublicKeyBase58Check: %v", err),
 			)
 			return
 		}
 	}
 
-	if requestData.DAOCoin2CreatorPublicKeyBase58CheckOrUsername != "" {
-		coin2ProfilePublicBase58Check, coin2PKID, err = fes.getPublicKeyBase58CheckAndPKIDForPublicKeyBase58CheckOrUsername(
+	if requestData.DAOCoin2CreatorPublicKeyBase58Check != DESOCoinIdentifierString {
+		coin2PKID, err = fes.getPKIDFromPublicKeyBase58Check(
 			utxoView,
-			requestData.DAOCoin2CreatorPublicKeyBase58CheckOrUsername,
+			requestData.DAOCoin2CreatorPublicKeyBase58Check,
 		)
 		if err != nil {
 			_AddBadRequestError(
 				ww,
-				fmt.Sprintf("GetDAOCoinLimitOrders: Invalid DAOCoin2CreatorPublicKeyBase58CheckOrUsername: %v", err),
+				fmt.Sprintf("GetDAOCoinLimitOrders: Invalid DAOCoin2CreatorPublicKeyBase58Check: %v", err),
 			)
 			return
 		}
@@ -114,14 +125,14 @@ func (fes *APIServer) GetDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Re
 	responses := append(
 		fes.buildDAOCoinLimitOrderResponsesFromEntriesForCoinPair(
 			utxoView,
-			coin1ProfilePublicBase58Check,
-			coin2ProfilePublicBase58Check,
+			requestData.DAOCoin1CreatorPublicKeyBase58Check,
+			requestData.DAOCoin2CreatorPublicKeyBase58Check,
 			ordersBuyingCoin1,
 		),
 		fes.buildDAOCoinLimitOrderResponsesFromEntriesForCoinPair(
 			utxoView,
-			coin2ProfilePublicBase58Check,
-			coin1ProfilePublicBase58Check,
+			requestData.DAOCoin2CreatorPublicKeyBase58Check,
+			requestData.DAOCoin1CreatorPublicKeyBase58Check,
 			ordersBuyingCoin2,
 		)...,
 	)
@@ -133,7 +144,7 @@ func (fes *APIServer) GetDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Re
 }
 
 type GetTransactorDAOCoinLimitOrdersRequest struct {
-	TransactorPublicKeyBase58CheckOrUsername string `safeForLogging:"true"`
+	TransactorPublicKeyBase58Check string `safeForLogging:"true"`
 }
 
 func (fes *APIServer) GetTransactorDAOCoinLimitOrders(ww http.ResponseWriter, req *http.Request) {
@@ -153,14 +164,14 @@ func (fes *APIServer) GetTransactorDAOCoinLimitOrders(ww http.ResponseWriter, re
 		return
 	}
 
-	transactorPublicKeyBase58Check, transactorPKID, err := fes.getPublicKeyBase58CheckAndPKIDForPublicKeyBase58CheckOrUsername(
+	transactorPKID, err := fes.getPKIDFromPublicKeyBase58Check(
 		utxoView,
-		requestData.TransactorPublicKeyBase58CheckOrUsername,
+		requestData.TransactorPublicKeyBase58Check,
 	)
 	if err != nil {
 		_AddBadRequestError(
 			ww,
-			fmt.Sprintf("GetTransactorDAOCoinLimitOrders: Invalid TransactorPublicKeyBase58CheckOrUsername: %v", err),
+			fmt.Sprintf("GetTransactorDAOCoinLimitOrders: Invalid TransactorPublicKeyBase58Check: %v", err),
 		)
 		return
 	}
@@ -171,7 +182,7 @@ func (fes *APIServer) GetTransactorDAOCoinLimitOrders(ww http.ResponseWriter, re
 		return
 	}
 
-	responses := fes.buildDAOCoinLimitOrderResponsesForTransactor(utxoView, transactorPublicKeyBase58Check, orders)
+	responses := fes.buildDAOCoinLimitOrderResponsesForTransactor(utxoView, requestData.TransactorPublicKeyBase58Check, orders)
 
 	if err = json.NewEncoder(ww).Encode(GetDAOCoinLimitOrdersResponse{Orders: responses}); err != nil {
 		_AddInternalServerError(ww, fmt.Sprintf("GetTransactorDAOCoinLimitOrders: Problem encoding response as JSON: %v", err))
@@ -179,22 +190,18 @@ func (fes *APIServer) GetTransactorDAOCoinLimitOrders(ww http.ResponseWriter, re
 	}
 }
 
-func (fes *APIServer) getPublicKeyBase58CheckAndPKIDForPublicKeyBase58CheckOrUsername(
+func (fes *APIServer) getPKIDFromPublicKeyBase58Check(
 	utxoView *lib.UtxoView,
-	publicKeyBase58CheckOrUsername string,
-) (string, *lib.PKID, error) {
-	publicKeyBytes, _, err := fes.GetPubKeyAndProfileEntryForUsernameOrPublicKeyBase58Check(
-		publicKeyBase58CheckOrUsername,
-		utxoView,
-	)
+	publicKeyBase58Check string,
+) (*lib.PKID, error) {
+	publicKeyBytes, err := GetPubKeyBytesFromBase58Check(publicKeyBase58Check)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	pkid := utxoView.GetPKIDForPublicKey(publicKeyBytes).PKID
-	publicKeyBase58Check := lib.Base58CheckEncode(publicKeyBytes, false, fes.Params)
 
-	return publicKeyBase58Check, pkid, nil
+	return pkid, nil
 }
 
 func (fes *APIServer) buildDAOCoinLimitOrderResponsesFromEntriesForCoinPair(
@@ -232,8 +239,8 @@ func (fes *APIServer) buildDAOCoinLimitOrderResponsesForTransactor(
 	var responses []DAOCoinLimitOrderEntryResponse
 
 	for _, order := range orders {
-		buyingCoinPublicKeyBase58Check := fes.getPublicKeyBase58CheckForPKID(utxoView, order.BuyingDAOCoinCreatorPKID)
-		sellingCoinPublicKeyBase58Check := fes.getPublicKeyBase58CheckForPKID(utxoView, order.SellingDAOCoinCreatorPKID)
+		buyingCoinPublicKeyBase58Check := fes.getPublicKeyBase58CheckOrCoinIdentifierForPKID(utxoView, order.BuyingDAOCoinCreatorPKID)
+		sellingCoinPublicKeyBase58Check := fes.getPublicKeyBase58CheckOrCoinIdentifierForPKID(utxoView, order.SellingDAOCoinCreatorPKID)
 
 		response, err := buildDAOCoinLimitOrderResponse(
 			transactorPublicKeyBase58Check,
@@ -255,8 +262,8 @@ func (fes *APIServer) buildDAOCoinLimitOrderResponsesForTransactor(
 	return responses
 }
 
-func (fes *APIServer) getPublicKeyBase58CheckForPKID(utxoView *lib.UtxoView, pkid *lib.PKID) string {
-	base58Check := ""
+func (fes *APIServer) getPublicKeyBase58CheckOrCoinIdentifierForPKID(utxoView *lib.UtxoView, pkid *lib.PKID) string {
+	base58Check := DESOCoinIdentifierString
 	if !pkid.IsZeroPKID() {
 		base58Check = lib.Base58CheckEncode(utxoView.GetPublicKeyForPKID(pkid), false, fes.Params)
 	}
@@ -277,7 +284,27 @@ func buildDAOCoinLimitOrderResponse(
 		return nil, err
 	}
 
-	exchangeRate, err := CalculateExchangeRateAsFloat(
+	price, err := CalculatePriceStringFromScaledExchangeRate(
+		buyingCoinPublicKeyBase58Check,
+		sellingCoinPublicKeyBase58Check,
+		order.ScaledExchangeRateCoinsToSellPerCoinToBuy,
+		operationTypeString,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	quantity, err := CalculateStringQuantityFromBaseUnits(
+		buyingCoinPublicKeyBase58Check,
+		sellingCoinPublicKeyBase58Check,
+		operationTypeString,
+		order.QuantityToFillInBaseUnits,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	exchangeRate, err := CalculateFloatFromScaledExchangeRate(
 		buyingCoinPublicKeyBase58Check,
 		sellingCoinPublicKeyBase58Check,
 		order.ScaledExchangeRateCoinsToSellPerCoinToBuy,
@@ -286,7 +313,7 @@ func buildDAOCoinLimitOrderResponse(
 		return nil, err
 	}
 
-	quantityToFill, err := CalculateQuantityToFillAsFloat(
+	quantityToFill, err := CalculateFloatQuantityFromBaseUnits(
 		buyingCoinPublicKeyBase58Check,
 		sellingCoinPublicKeyBase58Check,
 		operationTypeString,
@@ -301,8 +328,12 @@ func buildDAOCoinLimitOrderResponse(
 
 		BuyingDAOCoinCreatorPublicKeyBase58Check:  buyingCoinPublicKeyBase58Check,
 		SellingDAOCoinCreatorPublicKeyBase58Check: sellingCoinPublicKeyBase58Check,
-		ExchangeRateCoinsToSellPerCoinToBuy:       exchangeRate,
-		QuantityToFill:                            quantityToFill,
+
+		Price:    price,
+		Quantity: quantity,
+
+		ExchangeRateCoinsToSellPerCoinToBuy: exchangeRate,
+		QuantityToFill:                      quantityToFill,
 
 		OperationType: operationTypeString,
 
@@ -310,12 +341,116 @@ func buildDAOCoinLimitOrderResponse(
 	}, nil
 }
 
-// CalculateScaledExchangeRate given a buying coin, selling coin, and a coin-level float exchange rate, this calculates
+///////////////////////////////////////////////////////////////////////////////////
+// Helper functions to calculate price and exchange rates for DAO coin limit orders
+///////////////////////////////////////////////////////////////////////////////////
+
+// CalculateScaledExchangeRateFromPriceString calculates a scaled ExchangeRateCoinsToSellPerCoinsToBuy given a decimal
+// price string (ex: "1.23456") that represents an exchange rate between the two coins where the numerator is the coin
+// defined by the operation type.
+func CalculateScaledExchangeRateFromPriceString(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
+	price string,
+	operationType lib.DAOCoinLimitOrderOperationType,
+) (*uint256.Int, error) {
+	if err := validateNonNegativeDecimalString(price); err != nil {
+		return nil, err
+	}
+
+	rawScaledPrice, err := lib.CalculateScaledExchangeRateFromString(price)
+	if err != nil {
+		return nil, err
+	}
+	if rawScaledPrice.IsZero() {
+		return nil, errors.Errorf("The value %v is too small to produce a scaled exchange rate", price)
+	}
+
+	// This is an ASK order so we need to take the multiplicative inverse in order to produce an ExchangeRateCoinsToSellPerCoinToBuy
+	if operationType == lib.DAOCoinLimitOrderOperationTypeASK {
+		rawScaledPriceAsBigInt := rawScaledPrice.ToBig()
+
+		// Here we intend to calculate 1e38/price which gives us an ExchangeRateCoinsToSellPerCoinToBuy that's scaled up
+		// by 1e38. However, we can't avoid precision loss for irrational numbers, so we need to round up the quotient.
+		// The rounding allows ASK orders with irrational ExchangeRateCoinsToSellPerCoinToBuy values to match as expected
+		// with BID orders created using the same original input price. The integer division maths that gets us the intended
+		// result for ceil(1e38/price) using integer math is as follows:
+		//   (1e38*1e38 + price*1e38 - 1) / (price*1e38);
+		oneE76 := big.NewInt(0).Mul(lib.OneE38.ToBig(), lib.OneE38.ToBig())
+		numerator := big.NewInt(0).Add(oneE76, rawScaledPriceAsBigInt)
+		numerator = numerator.Sub(numerator, big.NewInt(1))
+
+		rawScaledExchangeRateAsBigInt := big.NewInt(0).Div(numerator, rawScaledPriceAsBigInt)
+
+		// For DESO <-> DAO coin trades, we scale the calculated exchange rate up or down by 1e9 to account for the
+		// scaling factor difference between DESO nanos and DAO coin base units
+		if buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+			// Scale the exchange rate up by 1e9 if the buying coin is DESO
+			rawScaledExchangeRateAsBigInt.Mul(rawScaledExchangeRateAsBigInt, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
+		} else if sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+			// Scale the exchange rate down by 1e9 if the selling coin is DESO if  and round the quotient up.
+			// For the same reason as above, we round up the quotient, so it matches with bid orders created using the
+			// same input price
+			exchangeRateDownscaleNumerator := big.NewInt(0).Add(
+				rawScaledExchangeRateAsBigInt,
+				getDESOToDAOCoinBaseUnitsScalingFactor().ToBig(),
+			)
+			exchangeRateDownscaleNumerator.Sub(exchangeRateDownscaleNumerator, big.NewInt(1))
+			rawScaledExchangeRateAsBigInt.Div(exchangeRateDownscaleNumerator, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
+		}
+
+		rawScaledExchangeRateWithPossibleOverflow, overflows := uint256.FromBig(rawScaledExchangeRateAsBigInt)
+		if overflows {
+			return nil, errors.Errorf("Overflow when converting %v to a scaled exchange rate", price)
+		}
+
+		return rawScaledExchangeRateWithPossibleOverflow, nil
+	}
+
+	// Beyond this point, we know that the operation type is lib.DAOCoinLimitOrderOperationTypeBID
+
+	// Scale up the price to account for DAO Coin -> DESO trades
+	if buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+		product := uint256.NewInt()
+		overflow := product.MulOverflow(rawScaledPrice, getDESOToDAOCoinBaseUnitsScalingFactor())
+		if overflow {
+			return nil, errors.Errorf("Overflow when converting %v to a scaled exchange rate", price)
+		}
+		return product, nil
+	}
+
+	// Scale down the price to account for DAO Coin -> DESO trades
+	if sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+		// We intentionally want to round the exchange rate down for BID orders so precision loss does not prevent the
+		// order from not getting matched with an ASK order with the same input price
+		quotient := uint256.NewInt().Div(rawScaledPrice, getDESOToDAOCoinBaseUnitsScalingFactor())
+		if quotient.IsZero() {
+			return nil, errors.Errorf("The %v produces a scaled exchange rate that is too small", price)
+		}
+		return quotient, nil
+	}
+
+	// There's no need to perform any scaling or calculate multiplicative inverse needed
+	// This only applies to BID orders for DAO coin <-> DAO coin traders
+	return rawScaledPrice, nil
+}
+
+// CalculateScaledExchangeRate acts as a pass through function to CalculateScaledExchangeRateFromFloat for backwards
+// compatibility
+func CalculateScaledExchangeRate(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
+	exchangeRateCoinsToSellPerCoinToBuy float64,
+) (*uint256.Int, error) {
+	return CalculateScaledExchangeRateFromFloat(buyingCoinPublicKeyBase58Check, sellingCoinPublicKeyBase58Check, exchangeRateCoinsToSellPerCoinToBuy)
+}
+
+// CalculateScaledExchangeRateFromFloat given a buying coin, selling coin, and a coin-level float exchange rate, this calculates
 // the base unit to base unit exchange rate for the coin pair, while accounting for the difference in base unit scaling
 // factors for $DESO (1e9) and DAO coins (1e18)
-func CalculateScaledExchangeRate(
-	buyingCoinPublicKeyBase58CheckOrUsername string,
-	sellingCoinPublicKeyBase58CheckOrUsername string,
+func CalculateScaledExchangeRateFromFloat(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
 	exchangeRateCoinsToSellPerCoinToBuy float64,
 ) (*uint256.Int, error) {
 	rawScaledExchangeRate, err := lib.CalculateScaledExchangeRateFromString(formatFloatAsString(exchangeRateCoinsToSellPerCoinToBuy))
@@ -325,7 +460,7 @@ func CalculateScaledExchangeRate(
 	if rawScaledExchangeRate.IsZero() {
 		return nil, errors.Errorf("The float value %f is too small to produce a scaled exchange rate", exchangeRateCoinsToSellPerCoinToBuy)
 	}
-	if buyingCoinPublicKeyBase58CheckOrUsername == "" {
+	if buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
 		// Buying coin is $DESO
 		product := uint256.NewInt()
 		overflow := product.MulOverflow(rawScaledExchangeRate, getDESOToDAOCoinBaseUnitsScalingFactor())
@@ -333,7 +468,7 @@ func CalculateScaledExchangeRate(
 			return nil, errors.Errorf("Overflow when convering %f to a scaled exchange rate", exchangeRateCoinsToSellPerCoinToBuy)
 		}
 		return product, nil
-	} else if sellingCoinPublicKeyBase58CheckOrUsername == "" {
+	} else if sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
 		// Selling coin is $DESO
 		quotient := uint256.NewInt().Div(rawScaledExchangeRate, getDESOToDAOCoinBaseUnitsScalingFactor())
 		if quotient.IsZero() {
@@ -344,99 +479,132 @@ func CalculateScaledExchangeRate(
 	return rawScaledExchangeRate, nil
 }
 
-// CalculateExchangeRateAsFloat given a buying coin, selling coin, and base unit to base unit exchange rate, this
-// calculates the coin-level float exchange rate for the coin pair, while accounting for the difference in base unit
-// scaling factors for $DESO (1e9) and DAO coins (1e18)
+// CalculatePriceStringFromScaledExchangeRate calculates price as a decimal string given a scaled ExchangeRateCoinsToSellPerCoinToBuy
+// The denominator for the output price is determined by the operation type
+// If operation type = BID, then price is the number of selling coins per buying coin
+// If operation type = ASK, then price is the number of buying coins per selling coin
+func CalculatePriceStringFromScaledExchangeRate(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
+	scaledValueExchangeRate *uint256.Int,
+	operationTypeString DAOCoinLimitOrderOperationTypeString,
+) (string, error) {
+	scaledExchangeRateAsBigInt := scaledValueExchangeRate.ToBig()
+
+	if buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+		scaledExchangeRateAsBigInt.Div(scaledExchangeRateAsBigInt, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
+	} else if sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
+		scaledExchangeRateAsBigInt.Mul(scaledExchangeRateAsBigInt, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
+	}
+
+	if operationTypeString == DAOCoinLimitOrderOperationTypeStringASK {
+		// Here, if this is an ask order, we need to take the inverse of the exchange rate because price needs to be
+		// the number of coins bought per coin sold
+		oneE76 := big.NewInt(0).Mul(lib.OneE38.ToBig(), lib.OneE38.ToBig())
+		scaledExchangeRateAsBigInt = big.NewInt(0).Div(oneE76, scaledExchangeRateAsBigInt)
+	}
+
+	return formatScaledUint256AsDecimalString(scaledExchangeRateAsBigInt, lib.OneE38.ToBig()), nil
+}
+
+// CalculateExchangeRateAsFloat acts as a pass-through function to CalculateFloatFromScaledExchangeRate for backwards
+// compatibility
 func CalculateExchangeRateAsFloat(
-	buyingCoinPublicKeyBase58CheckOrUsername string,
-	sellingCoinPublicKeyBase58CheckOrUsername string,
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
+	scaledValue *uint256.Int,
+) (float64, error) {
+	return CalculateFloatFromScaledExchangeRate(buyingCoinPublicKeyBase58Check, sellingCoinPublicKeyBase58Check, scaledValue)
+}
+
+// CalculateFloatFromScaledExchangeRate given a buying coin, selling coin, and base unit to base unit exchange
+// rate, this calculates the coin-level float exchange rate for the coin pair, while accounting for the difference in
+// base unit scaling factors for $DESO (1e9) and DAO coins (1e18)
+func CalculateFloatFromScaledExchangeRate(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
 	scaledValue *uint256.Int,
 ) (float64, error) {
 	scaledValueAsBigInt := scaledValue.ToBig()
-	if buyingCoinPublicKeyBase58CheckOrUsername == "" {
+	if buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
 		scaledValueAsBigInt.Div(scaledValueAsBigInt, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
-	} else if sellingCoinPublicKeyBase58CheckOrUsername == "" {
+	} else if sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString {
 		scaledValueAsBigInt.Mul(scaledValueAsBigInt, getDESOToDAOCoinBaseUnitsScalingFactor().ToBig())
 	}
 
-	oneE38AsBigInt := lib.OneE38.ToBig()
-
-	whole := big.NewInt(0).Div(scaledValueAsBigInt, oneE38AsBigInt)
-	decimal := big.NewInt(0).Mod(scaledValueAsBigInt, oneE38AsBigInt)
-	decimalLeadingZeros := strings.Repeat("0", getNumDigits(oneE38AsBigInt)-getNumDigits(decimal)-1)
-
-	str := fmt.Sprintf("%d.%s%d", whole, decimalLeadingZeros, decimal)
-	parsedFloat, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		// This should never happen since we're formatting the float ourselves above
-		return 0, err
-	}
-	return parsedFloat, nil
+	return calculateScaledUint256AsFloat(scaledValueAsBigInt, lib.OneE38.ToBig())
 }
 
-// CalculateQuantityToFillAsFloat given a buying coin, selling coin, operationType and a float quantity in base units,
-// this calculates the float coin quantity for side the operationType refers to
-func CalculateQuantityToFillAsFloat(
-	buyingCoinPublicKeyBase58CheckOrUsername string,
-	sellingCoinPublicKeyBase58CheckOrUsername string,
+/////////////////////////////////////////////////////////////////////
+// Helper functions to calculate quantities for DAO coin limit orders
+/////////////////////////////////////////////////////////////////////
+
+// CalculateStringQuantityFromBaseUnits given a buying coin, selling coin, operationType and quantity in base units,
+// this calculates the decimal string coin quantity for the side the operation type refers to
+func CalculateStringQuantityFromBaseUnits(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
+	operationTypeString DAOCoinLimitOrderOperationTypeString,
+	quantityToFillInBaseUnits *uint256.Int,
+) (string, error) {
+	if quantityToFillInBaseUnits.IsZero() {
+		// This should never happen since quantityToFillInBaseUnits is coming from consensus. We make this check here
+		// to exist early, if there's an issue with the order book
+		return "", errors.Errorf("quantityToFillInBaseUnits cannot be less than 0")
+	}
+
+	if isCoinToFillDESO(
+		buyingCoinPublicKeyBase58Check,
+		sellingCoinPublicKeyBase58Check,
+		operationTypeString,
+	) {
+		return formatScaledUint256AsDecimalString(quantityToFillInBaseUnits.ToBig(), big.NewInt(int64(lib.NanosPerUnit))), nil
+	}
+	return formatScaledUint256AsDecimalString(quantityToFillInBaseUnits.ToBig(), lib.BaseUnitsPerCoin.ToBig()), nil
+}
+
+// CalculateFloatQuantityFromBaseUnits calculates the float coin quantity in whole units given a buying coin, selling coin,
+// operationType and a quantity in base units
+func CalculateFloatQuantityFromBaseUnits(
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
 	operationTypeString DAOCoinLimitOrderOperationTypeString,
 	quantityToFillInBaseUnits *uint256.Int,
 ) (float64, error) {
+	if quantityToFillInBaseUnits.IsZero() {
+		// This should never happen since quantityToFillInBaseUnits is coming from consensus. We make this check here
+		// to exist early, if there's an issue with the order book
+		return 0, errors.Errorf("quantityToFillInBaseUnits cannot be less than 0")
+	}
+
 	if isCoinToFillDESO(
-		buyingCoinPublicKeyBase58CheckOrUsername,
-		sellingCoinPublicKeyBase58CheckOrUsername,
+		buyingCoinPublicKeyBase58Check,
+		sellingCoinPublicKeyBase58Check,
 		operationTypeString,
 	) {
-		return calculateQuantityToFillFromDESONanosToFloat(quantityToFillInBaseUnits)
+		return calculateScaledUint256AsFloat(
+			quantityToFillInBaseUnits.ToBig(),
+			big.NewInt(int64(lib.NanosPerUnit)),
+		)
 	}
-	return calculateQuantityToFillFromDAOCoinBaseUnitsToFloat(quantityToFillInBaseUnits)
-}
-
-// calculate (quantityInBaseUnits / 10^18)
-func calculateQuantityToFillFromDAOCoinBaseUnitsToFloat(quantityInBaseUnits *uint256.Int) (float64, error) {
-	return calculateQuantityToFillAsFloatWithScalingFactor(
-		quantityInBaseUnits,
-		lib.BaseUnitsPerCoin,
-	)
-}
-
-// calculate (quantityInBaseUnits / 10^9)
-func calculateQuantityToFillFromDESONanosToFloat(quantityInNanos *uint256.Int) (float64, error) {
-	return calculateQuantityToFillAsFloatWithScalingFactor(
-		quantityInNanos,
-		uint256.NewInt().SetUint64(lib.NanosPerUnit),
-	)
-}
-
-// calculate (quantityInBaseUnits / 10^9)
-func calculateQuantityToFillAsFloatWithScalingFactor(
-	quantityAsScaledValue *uint256.Int,
-	scalingFactor *uint256.Int,
-) (float64, error) {
-	whole := uint256.NewInt().Div(quantityAsScaledValue, scalingFactor)
-	decimal := uint256.NewInt().Mod(quantityAsScaledValue, scalingFactor)
-	decimalLeadingZeros := strings.Repeat("0", getNumDigits(scalingFactor.ToBig())-getNumDigits(decimal.ToBig())-1)
-
-	str := fmt.Sprintf("%d.%s%d", whole, decimalLeadingZeros, decimal)
-	parsedFloat, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		// This should never happen since we're formatting the float ourselves above
-		return 0, err
-	}
-	return parsedFloat, nil
+	return calculateScaledUint256AsFloat(quantityToFillInBaseUnits.ToBig(), lib.BaseUnitsPerCoin.ToBig())
 }
 
 // CalculateQuantityToFillAsBaseUnits given a buying coin, selling coin, operationType and a float coin quantity,
 // this calculates the quantity in base units for the side the operationType refers to
 func CalculateQuantityToFillAsBaseUnits(
-	buyingCoinPublicKeyBase58CheckOrUsername string,
-	sellingCoinPublicKeyBase58CheckOrUsername string,
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
 	operationTypeString DAOCoinLimitOrderOperationTypeString,
-	quantityToFill float64,
+	quantityToFill string,
 ) (*uint256.Int, error) {
+	if err := validateNonNegativeDecimalString(quantityToFill); err != nil {
+		return nil, err
+	}
+
 	if isCoinToFillDESO(
-		buyingCoinPublicKeyBase58CheckOrUsername,
-		sellingCoinPublicKeyBase58CheckOrUsername,
+		buyingCoinPublicKeyBase58Check,
+		sellingCoinPublicKeyBase58Check,
 		operationTypeString,
 	) {
 		return calculateQuantityToFillAsDESONanos(
@@ -449,41 +617,44 @@ func CalculateQuantityToFillAsBaseUnits(
 }
 
 // calculate (quantityToFill * 10^18)
-func calculateQuantityToFillAsDAOCoinBaseUnits(quantityToFill float64) (*uint256.Int, error) {
-	return calculateQuantityToFillToBaseUnitsWithScalingFactor(
+func calculateQuantityToFillAsDAOCoinBaseUnits(quantityToFill string) (*uint256.Int, error) {
+	scaledQuantity, err := lib.ScaleFloatFormatStringToUint256(
 		quantityToFill,
 		lib.BaseUnitsPerCoin,
 	)
+	if err != nil {
+		return nil, err
+	}
+	if scaledQuantity.IsZero() {
+		return nil, errors.Errorf("The input quantity %v produces a value of 0 when scaled to base units nanos", quantityToFill)
+	}
+	return scaledQuantity, nil
 }
 
 // calculate (quantityToFill * 10^9)
-func calculateQuantityToFillAsDESONanos(quantityToFill float64) (*uint256.Int, error) {
-	return calculateQuantityToFillToBaseUnitsWithScalingFactor(
+func calculateQuantityToFillAsDESONanos(quantityToFill string) (*uint256.Int, error) {
+	scaledQuantity, err := lib.ScaleFloatFormatStringToUint256(
 		quantityToFill,
 		uint256.NewInt().SetUint64(lib.NanosPerUnit),
 	)
-}
-
-// calculate (quantityToFill * scalingFactor)
-func calculateQuantityToFillToBaseUnitsWithScalingFactor(
-	quantityToFill float64,
-	scalingFactor *uint256.Int,
-) (*uint256.Int, error) {
-	return lib.ScaleFloatFormatStringToUint256(
-		formatFloatAsString(quantityToFill),
-		scalingFactor,
-	)
+	if err != nil {
+		return nil, err
+	}
+	if scaledQuantity.IsZero() {
+		return nil, errors.Errorf("The input quantity %v produces a value of 0 when scaled to DESO nanos", quantityToFill)
+	}
+	return scaledQuantity, nil
 }
 
 // given a buying coin, selling coin, and operation type, this determines if the QuantityToFill field
 // for the coin the quantity field refers to is $DESO. If it's not $DESO, then it's assumed to be a DAO coin
 func isCoinToFillDESO(
-	buyingCoinPublicKeyBase58CheckOrUsername string,
-	sellingCoinPublicKeyBase58CheckOrUsername string,
+	buyingCoinPublicKeyBase58Check string,
+	sellingCoinPublicKeyBase58Check string,
 	operationTypeString DAOCoinLimitOrderOperationTypeString,
 ) bool {
-	return buyingCoinPublicKeyBase58CheckOrUsername == "" && operationTypeString == DAOCoinLimitOrderOperationTypeStringBID ||
-		sellingCoinPublicKeyBase58CheckOrUsername == "" && operationTypeString == DAOCoinLimitOrderOperationTypeStringASK
+	return buyingCoinPublicKeyBase58Check == DESOCoinIdentifierString && operationTypeString == DAOCoinLimitOrderOperationTypeStringBID ||
+		sellingCoinPublicKeyBase58Check == DESOCoinIdentifierString && operationTypeString == DAOCoinLimitOrderOperationTypeStringASK
 }
 
 // DAOCoinLimitOrderOperationTypeString A convenience type that uses a string to represent BID / ASK side in the API,
@@ -549,6 +720,48 @@ func getDESOToDAOCoinBaseUnitsScalingFactor() *uint256.Int {
 	)
 }
 
+// Given a value v that is a scaled uint256 with the provided scaling factor, this prints the decimal representation
+// of v as a string
+// Ex: if v = 12345 and scalingFactor = 100, then this outputs 123.45
+func formatScaledUint256AsDecimalString(v *big.Int, scalingFactor *big.Int) string {
+	wholeNumber := big.NewInt(0).Div(v, scalingFactor)
+	decimalPart := big.NewInt(0).Mod(v, scalingFactor)
+
+	decimalPartIsZero := decimalPart.Cmp(big.NewInt(0)) == 0
+
+	scalingFactorDigits := getNumDigits(scalingFactor)
+	decimalPartAsString := fmt.Sprintf("%d", decimalPart)
+
+	// Left pad the decimal part with zeros
+	if !decimalPartIsZero && len(decimalPartAsString) != scalingFactorDigits {
+		decimalLeadingZeros := strings.Repeat("0", scalingFactorDigits-len(decimalPartAsString)-1)
+		decimalPartAsString = fmt.Sprintf("%v%v", decimalLeadingZeros, decimalPartAsString)
+	}
+
+	// Trim trailing zeros
+	if !decimalPartIsZero {
+		decimalPartAsString = strings.TrimRight(decimalPartAsString, "0")
+	}
+	return fmt.Sprintf("%d.%v", wholeNumber, decimalPartAsString)
+}
+
+// Given a value v that is a scaled uint256 with the provided scaling factor, this prints v as a float scaled down
+// by the scaling factor
+// Ex: if v = 12345 and scalingFactor = 100, then this outputs 123.45
+func calculateScaledUint256AsFloat(v *big.Int, scalingFactor *big.Int) (float64, error) {
+	wholeNumber := big.NewInt(0).Div(v, scalingFactor)
+	decimalPart := big.NewInt(0).Mod(v, scalingFactor)
+	decimalLeadingZeros := strings.Repeat("0", getNumDigits(scalingFactor)-getNumDigits(decimalPart)-1)
+
+	str := fmt.Sprintf("%d.%s%d", wholeNumber, decimalLeadingZeros, decimalPart)
+	parsedFloat, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		// This should never happen since we're formatting the float ourselves above
+		return 0, err
+	}
+	return parsedFloat, nil
+}
+
 // 15 is a magic number that represents the precision supported by the IEEE-754 float64 standard.
 //
 // If f is large (1e15 or higher), then we truncate any values beyond the first 15 digits, as
@@ -585,4 +798,243 @@ func getNumDigits(val *big.Int) int {
 		quotient.Div(quotient, ten)
 	}
 	return numDigits
+}
+
+// This is a quick sanity check. Any valid decimal string should successfully parse into a non-negative float64
+func validateNonNegativeDecimalString(str string) error {
+	floatValue, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return errors.Errorf("Error parsing input %v as a decimal string: %v", str, err)
+	}
+	if floatValue < 0 {
+		return errors.Errorf("Input decimal string %v is unexpectedly less than 0", str)
+	}
+	return nil
+}
+
+func (fes *APIServer) validateTransactorSellingCoinBalance(
+	transactorPublicKeyBase58Check string,
+	buyingDAOCoinCreatorPublicKeyBase58Check string,
+	sellingDAOCoinCreatorPublicKeyBase58Check string,
+	operationType DAOCoinLimitOrderOperationTypeString,
+	scaledExchangeRateCoinsToSellPerCoinToBuy *uint256.Int,
+	quantityToFillInBaseUnits *uint256.Int) error {
+	// Validate transactor has sufficient selling coins to place
+	// this new order incorporating all of their open orders.
+
+	// Get UTXO view.
+	utxoView, err := fes.backendServer.GetMempool().GetAugmentedUniversalView()
+	if err != nil {
+		return errors.Errorf("Problem fetching UTXOView: %v", err)
+	}
+
+	// Get transactor PKID and public key from public key base58 check.
+	transactorPKID, err := fes.getPKIDFromPublicKeyBase58Check(
+		utxoView, transactorPublicKeyBase58Check)
+	if err != nil {
+		return errors.Errorf("Invalid TransactorPublicKeyBase58Check: %v", err)
+	}
+	transactorPublicKey, _, err := lib.Base58CheckDecode(transactorPublicKeyBase58Check)
+	if err != nil {
+		return errors.Errorf("Error decoding transactor public key: %v", err)
+	}
+
+	// If buying $DESO, the buying PKID is the ZeroPKID. Else it's the DAO coin's PKID.
+	buyingCoinPKID := &lib.ZeroPKID
+	if buyingDAOCoinCreatorPublicKeyBase58Check != DESOCoinIdentifierString {
+		buyingCoinPKID, err = fes.getPKIDFromPublicKeyBase58Check(
+			utxoView, buyingDAOCoinCreatorPublicKeyBase58Check)
+		if err != nil {
+			return errors.Errorf("Invalid BuyingDAOCoinCreatorPublicKeyBase58Check: %v", err)
+		}
+	}
+
+	// If selling $DESO, the selling PKID is the ZeroPKID. We consider this the default
+	// case and update if the transactor is actually selling a DAO coin below.
+	sellingCoinPKID := &lib.ZeroPKID
+
+	// Calculate current balance for transactor.
+	transactorSellingBalanceBaseUnits := uint256.NewInt()
+	if sellingDAOCoinCreatorPublicKeyBase58Check == DESOCoinIdentifierString {
+		// Get $DESO balance nanos.
+		desoBalanceNanos, err := utxoView.GetDeSoBalanceNanosForPublicKey(transactorPublicKey)
+		if err != nil {
+			return errors.Errorf("Error getting transactor DESO balance: %v", err)
+		}
+		transactorSellingBalanceBaseUnits = uint256.NewInt().SetUint64(desoBalanceNanos)
+	} else {
+		// Get selling coin PKID and public key from public key base58 check.
+		sellingCoinPKID, err = fes.getPKIDFromPublicKeyBase58Check(
+			utxoView, sellingDAOCoinCreatorPublicKeyBase58Check)
+		if err != nil {
+			return errors.Errorf("Invalid SellingDAOCoinCreatorPublicKeyBase58Check: %v", err)
+		}
+		sellingPublicKey, _, err := lib.Base58CheckDecode(sellingDAOCoinCreatorPublicKeyBase58Check)
+		if err != nil {
+			return errors.Errorf("Error decoding selling public key: %v", err)
+		}
+
+		// Get DAO coin balance base units.
+		balanceEntry, _, _ := utxoView.GetBalanceEntryForHODLerPubKeyAndCreatorPubKey(transactorPublicKey, sellingPublicKey, true)
+		if balanceEntry == nil {
+			return errors.New("Error getting transactor DAO coin balance not found")
+		}
+		transactorSellingBalanceBaseUnits = &balanceEntry.BalanceNanos
+	}
+
+	// Get open orders for this transactor
+	orders, err := utxoView.GetAllDAOCoinLimitOrdersForThisTransactor(transactorPKID)
+	if err != nil {
+		return errors.Errorf("Error getting limit orders: %v", err)
+	}
+
+	// Calculate total selling quantity for current order.
+	totalSellingBaseUnits := uint256.NewInt()
+	if operationType == DAOCoinLimitOrderOperationTypeStringASK {
+		totalSellingBaseUnits = quantityToFillInBaseUnits
+	} else if operationType == DAOCoinLimitOrderOperationTypeStringBID {
+		totalSellingBaseUnits, err = lib.ComputeBaseUnitsToSellUint256(
+			scaledExchangeRateCoinsToSellPerCoinToBuy, quantityToFillInBaseUnits)
+		if err != nil {
+			return errors.Errorf("Error calculating new order selling quantity: %v", err)
+		}
+	} else {
+		return errors.Errorf("Invalid operation type: %s", operationType)
+	}
+
+	// Add total selling quantity for existing/open orders.
+	for _, order := range orders {
+		if buyingCoinPKID.Eq(order.BuyingDAOCoinCreatorPKID) &&
+			sellingCoinPKID.Eq(order.SellingDAOCoinCreatorPKID) {
+			// Calculate selling quantity.
+			orderSellingBaseUnits, err := order.BaseUnitsToSellUint256()
+			if err != nil {
+				return errors.Errorf("Error calculating open order selling quantity: %v", err)
+			}
+
+			// Sum selling quantity.
+			totalSellingBaseUnits, err = lib.SafeUint256().Add(totalSellingBaseUnits, orderSellingBaseUnits)
+			if err != nil {
+				return errors.Errorf("Error adding open order selling quantity: %v", err)
+			}
+		}
+	}
+
+	// Compare transactor selling balance to total selling quantity.
+	if transactorSellingBalanceBaseUnits.Lt(totalSellingBaseUnits) {
+		return errors.Errorf("Insufficient balance to open order")
+	}
+
+	// Happy path. No error. Transactor has sufficient balance to cover their selling quantity.
+	return nil
+}
+
+func (fes *APIServer) getDAOCoinLimitOrderSimulatedExecutionResult(
+	utxoView *lib.UtxoView,
+	transactorPublicKeyBase58Check string,
+	buyingDAOCoinCreatorPublicKeyBase58Check string,
+	sellingDAOCoinCreatorPublicKeyBase58Check string,
+	txn *lib.MsgDeSoTxn,
+) (*DAOCoinLimitOrderSimulatedExecutionResult, error) {
+	buyingCoinStartingBalance, err := fes.getTransactorDesoOrDaoCoinBalance(utxoView, transactorPublicKeyBase58Check, buyingDAOCoinCreatorPublicKeyBase58Check)
+	if err != nil {
+		return nil, err
+	}
+	sellingCoinStartingBalance, err := fes.getTransactorDesoOrDaoCoinBalance(utxoView, transactorPublicKeyBase58Check, sellingDAOCoinCreatorPublicKeyBase58Check)
+	if err != nil {
+		return nil, err
+	}
+
+	txnFees, err := fes.simulateSubmitTransaction(utxoView, txn)
+	if err != nil {
+		return nil, err
+	}
+
+	buyingCoinEndingBalance, err := fes.getTransactorDesoOrDaoCoinBalance(utxoView, transactorPublicKeyBase58Check, buyingDAOCoinCreatorPublicKeyBase58Check)
+	if err != nil {
+		return nil, err
+	}
+	if buyingDAOCoinCreatorPublicKeyBase58Check == DESOCoinIdentifierString {
+		// If the buying coin is DESO, then the ending balance change will have the transaction fee subtracted. In order to
+		// isolate the amount of the buying coin bought as a part of this order, we need to add back the transaction fee
+		buyingCoinEndingBalance.Add(buyingCoinEndingBalance, uint256.NewInt().SetUint64(txnFees))
+	}
+
+	sellingCoinEndingBalance, err := fes.getTransactorDesoOrDaoCoinBalance(utxoView, transactorPublicKeyBase58Check, sellingDAOCoinCreatorPublicKeyBase58Check)
+	if err != nil {
+		return nil, err
+	}
+	if sellingDAOCoinCreatorPublicKeyBase58Check == DESOCoinIdentifierString {
+		// If the selling coin is DESO, then the ending balance will have the network fee subtracted. In order to isolate
+		// the amount of the selling coin sold as a part of this order, we need to add back the transaction fee to the
+		// ending balance
+		sellingCoinEndingBalance.Add(sellingCoinEndingBalance, uint256.NewInt().SetUint64(txnFees))
+	}
+
+	buyingCoinBalanceChange := "0.0"
+	sellingCoinBalanceChange := "0.0"
+
+	if buyingCoinEndingBalance.Lt(buyingCoinStartingBalance) {
+		return nil, errors.Errorf("Buying coin balance cannot decrease as a result of a DAO coin limit order execution")
+	}
+
+	if sellingCoinEndingBalance.Gt(sellingCoinStartingBalance) {
+		return nil, errors.Errorf("Selling coin balance cannot increase as a result of a DAO coin limit order execution")
+	}
+
+	// Convert buying coin balance change from uint256 to as a decimal string (ex: 1.23)
+	buyingCoinBalanceChange = formatScaledUint256AsDecimalString(
+		uint256.NewInt().Sub(buyingCoinEndingBalance, buyingCoinStartingBalance).ToBig(),
+		getScalingFactorForCoin(buyingDAOCoinCreatorPublicKeyBase58Check).ToBig(),
+	)
+
+	// Convert selling coin balance change from uint256 to as a decimal string (ex: 1.23)
+	sellingCoinBalanceChange = formatScaledUint256AsDecimalString(
+		uint256.NewInt().Sub(sellingCoinStartingBalance, sellingCoinEndingBalance).ToBig(),
+		getScalingFactorForCoin(sellingDAOCoinCreatorPublicKeyBase58Check).ToBig(),
+	)
+
+	return &DAOCoinLimitOrderSimulatedExecutionResult{
+		BuyingCoinQuantityFilled:  buyingCoinBalanceChange,
+		SellingCoinQuantityFilled: sellingCoinBalanceChange,
+	}, nil
+}
+
+func (fes *APIServer) getTransactorDesoOrDaoCoinBalance(
+	utxoView *lib.UtxoView,
+	transactorPublicKeyBase58Check string,
+	desoOrDAOCoinCreatorPublicKeyBase58Check string,
+) (*uint256.Int, error) {
+	transactorPublicKey, _, err := lib.Base58CheckDecode(transactorPublicKeyBase58Check)
+	if err != nil {
+		return nil, errors.Errorf("Error decoding transactor public key: %v", err)
+	}
+
+	if desoOrDAOCoinCreatorPublicKeyBase58Check == DESOCoinIdentifierString {
+		// Get $DESO balance nanos.
+		desoBalanceNanos, err := utxoView.GetDeSoBalanceNanosForPublicKey(transactorPublicKey)
+		if err != nil {
+			return nil, errors.Errorf("Error getting transactor DESO balance: %v", err)
+		}
+		return uint256.NewInt().SetUint64(desoBalanceNanos), nil
+	}
+
+	daoCoinCreatorPublicKey, _, err := lib.Base58CheckDecode(desoOrDAOCoinCreatorPublicKeyBase58Check)
+	if err != nil {
+		return nil, errors.Errorf("Error decoding dao coin public key: %v", err)
+	}
+
+	// Get DAO coin balance base units.
+	balanceEntry, _, _ := utxoView.GetBalanceEntryForHODLerPubKeyAndCreatorPubKey(transactorPublicKey, daoCoinCreatorPublicKey, true)
+	if balanceEntry == nil {
+		return nil, errors.New("Error getting transactor DAO coin balance")
+	}
+	return &balanceEntry.BalanceNanos, nil
+}
+
+func getScalingFactorForCoin(coinCreatorPublicKeyBase58Check string) *uint256.Int {
+	if coinCreatorPublicKeyBase58Check == DESOCoinIdentifierString {
+		return uint256.NewInt().SetUint64(lib.NanosPerUnit)
+	}
+	return uint256.NewInt().Set(lib.BaseUnitsPerCoin)
 }
